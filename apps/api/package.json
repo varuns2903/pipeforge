@@ -1,0 +1,35 @@
+{
+  "name": "@pipeforge/api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.2.0",
+    "@types/supertest": "^7.2.1",
+    "@types/uuid": "^10.0.0",
+    "supertest": "^7.2.2",
+    "vitest": "^5.0.0"
+  },
+  "dependencies": {
+    "@pipeforge/pipeline-engine": "^1.0.0",
+    "@pipeforge/shared": "^1.0.0",
+    "bullmq": "^6.3.4",
+    "ioredis": "^6.0.0",
+    "multer": "^2.3.0",
+    "socket.io": "^4.8.3",
+    "uuid": "^14.0.2"
+  }
+}
