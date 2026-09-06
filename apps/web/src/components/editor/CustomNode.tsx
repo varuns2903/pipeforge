@@ -1,12 +1,15 @@
 import { Handle, Position } from '@xyflow/react';
 import { useDirection } from './DirectionContext';
-import { Database, Filter, Settings, FileOutput, Calculator } from 'lucide-react';
+import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus } from 'lucide-react';
 
 const icons: Record<string, any> = {
   'csv-input': Database,
   'json-input': Database,
   'filter': Filter,
   'select-columns': Settings,
+  'rename-columns': Settings,
+  'sort': ArrowDownAZ,
+  'deduplicate': CopyMinus,
   'csv-output': FileOutput,
   'aggregate': Calculator
 };

@@ -173,15 +173,48 @@ export class PipelineEngine {
           return newRow;
         });
 
-      case 'select-columns':
+            case 'select-columns':
         if (!config.columns) return input;
-        const columnsToKeep = config.columns.split(',').map((c: string) => c.trim());
+        const cols = config.columns.split(',').map((c: string) => c.trim());
         return input.map(row => {
           const newRow: any = {};
-          for (const col of columnsToKeep) {
+          cols.forEach((col: string) => {
             if (row[col] !== undefined) newRow[col] = row[col];
-          }
+          });
           return newRow;
+        });
+
+      case 'sort':
+        if (!config.sortBy) return input;
+        const sortBy = config.sortBy;
+        const order = config.order === 'desc' ? -1 : 1;
+        
+        return [...input].sort((a, b) => {
+          const valA = a[sortBy];
+          const valAIsNum = !isNaN(Number(valA)) && valA !== null && valA !== '';
+          const valB = b[sortBy];
+          const valBIsNum = !isNaN(Number(valB)) && valB !== null && valB !== '';
+          
+          if (valAIsNum && valBIsNum) {
+            return (Number(valA) - Number(valB)) * order;
+          }
+          
+          // String fallback
+          const strA = String(valA || '');
+          const strB = String(valB || '');
+          return strA.localeCompare(strB) * order;
+        });
+
+      case 'deduplicate':
+        if (!config.columns) return input;
+        const dedupeCols = config.columns.split(',').map((c: string) => c.trim());
+        const seen = new Set<string>();
+        
+        return input.filter(row => {
+          const key = dedupeCols.map((col: string) => String(row[col])).join('|');
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
         });
 
       case 'aggregate':

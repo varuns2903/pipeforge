@@ -387,3 +387,17 @@
 **Completed Tasks:**
 - Integrated `useReactFlow().screenToFlowPosition()` API inside the pipeline editor.
 - Bypassed native DOM `getBoundingClientRect()` calculation for Node Drag & Drops. This ensures that a dropped node automatically spawns directly beneath the user's cursor pointer regardless of the canvas's current zoom level or pan offset.
+
+---
+
+**Current Phase:** Phase 13 (Sort & Deduplicate Nodes)
+
+**Completed Tasks:**
+- Added `Sort Data` node:
+  - Frontend UI lets users define a Target Column and a Sort Order (Ascending or Descending).
+  - Engine backend correctly detects string vs numeric columns, falling back to `localeCompare` or numeric substraction respectively to execute stable array sorts.
+- Added `Remove Duplicates` node:
+  - Frontend UI lets users define a comma-separated list of target columns.
+  - Engine backend constructs composite string keys from the targets and aggressively filters the dataset using a highly performant `Set`, preserving the very first occurrence of a duplicate row.
+- Updated `NodePalette.tsx` to expose both nodes under the "Transform" category.
+- Updated `CustomNode.tsx` to automatically attach the appropriate Lucide icons (`ArrowDownAZ` and `CopyMinus`) based on the data node properties.

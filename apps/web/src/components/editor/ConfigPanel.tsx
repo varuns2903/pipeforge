@@ -159,7 +159,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges }: { selectedNode
             </div>
           )}
 
-          {/* SELECT COLUMNS */}
+                    {/* SELECT COLUMNS */}
           {selectedNode.data.nodeType === 'select-columns' && (
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Columns to Keep</label>
@@ -171,6 +171,49 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges }: { selectedNode
                 placeholder="name, age, country"
               />
               <p className="text-xs text-text-tertiary mt-2">Comma separated list of columns to preserve.</p>
+            </div>
+          )}
+
+          {/* SORT DATA */}
+          {selectedNode.data.nodeType === 'sort' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Sort By Column</label>
+                <input
+                  type="text"
+                  value={config.sortBy || ''}
+                  onChange={(e) => updateConfig({ sortBy: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                  placeholder="e.g. age"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Order</label>
+                <select
+                  value={config.order || 'asc'}
+                  onChange={(e) => updateConfig({ order: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="asc">Ascending (A-Z, 0-9)</option>
+                  <option value="desc">Descending (Z-A, 9-0)</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* DEDUPLICATE */}
+          {selectedNode.data.nodeType === 'deduplicate' && (
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Target Columns</label>
+              <input
+                type="text"
+                value={config.columns || ''}
+                onChange={(e) => updateConfig({ columns: e.target.value })}
+                className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                placeholder="email, username"
+              />
+              <p className="text-xs text-text-tertiary mt-2">Comma separated list. Rows with duplicate values across these columns will be removed (keeps the first occurrence).</p>
             </div>
           )}
 

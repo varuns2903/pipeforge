@@ -1,4 +1,4 @@
-import { Database, Filter, Settings, FileOutput, Calculator, Type } from 'lucide-react';
+import { Database, Filter, Settings, FileOutput, Calculator, Type, ArrowDownAZ, CopyMinus } from 'lucide-react';
 
 const NODE_TYPES = [
   { category: 'Input', items: [
@@ -9,6 +9,8 @@ const NODE_TYPES = [
     { type: 'filter', label: 'Filter Rows', icon: Filter },
     { type: 'select-columns', label: 'Select Columns', icon: Settings },
     { type: 'rename-columns', label: 'Rename Columns', icon: Type },
+    { type: 'sort', label: 'Sort Data', icon: ArrowDownAZ },
+    { type: 'deduplicate', label: 'Remove Duplicates', icon: CopyMinus },
   ]},
   { category: 'Aggregate', items: [
     { type: 'aggregate', label: 'Group & Aggregate', icon: Calculator },
