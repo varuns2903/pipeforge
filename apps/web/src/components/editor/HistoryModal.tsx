@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { X, Clock, CheckCircle, AlertTriangle, Download } from 'lucide-react';
+import { X, Clock, CheckCircle, AlertTriangle, Download, Settings } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 
 export function HistoryModal({ onClose }: { onClose: () => void }) {
@@ -113,6 +113,12 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
                     <h3 className="text-lg font-medium text-text-primary">Run {runDetail._id.slice(-6)}</h3>
                     {renderStatus(runDetail.status)}
                   </div>
+                  {runDetail.pipelineSnapshot && (
+                    <div className="mb-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-3 border border-border-strong text-xs text-text-secondary">
+                      <Settings size={12} className="text-accent-500" />
+                      <span>Immutable Snapshot: {runDetail.pipelineSnapshot.nodes?.length || 0} nodes, {runDetail.pipelineSnapshot.edges?.length || 0} edges</span>
+                    </div>
+                  )}
                   
                   {runDetail.error && (
                     <div className="p-4 bg-status-error/10 border border-status-error/20 rounded-lg text-status-error text-sm mb-4">

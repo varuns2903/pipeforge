@@ -27,7 +27,7 @@ export class ProjectController {
 
   async get(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const project = await projectService.getById(req.params.projectId, req.user.id);
+      const project = await projectService.getById((req.params.projectId as string), req.user.id);
       res.json(mapToDTO(project));
     } catch (err: any) {
       if (err.message === 'Project not found') return res.status(404).json({ error: err.message });
@@ -37,7 +37,7 @@ export class ProjectController {
 
   async update(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const project = await projectService.update(req.params.projectId, req.user.id, req.body.name);
+      const project = await projectService.update((req.params.projectId as string), req.user.id, req.body.name);
       res.json(mapToDTO(project));
     } catch (err: any) {
       if (err.message === 'Project not found') return res.status(404).json({ error: err.message });
@@ -47,7 +47,7 @@ export class ProjectController {
 
   async delete(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await projectService.delete(req.params.projectId, req.user.id);
+      await projectService.delete((req.params.projectId as string), req.user.id);
       res.status(204).send();
     } catch (err: any) {
       if (err.message === 'Project not found') return res.status(404).json({ error: err.message });

@@ -401,3 +401,14 @@
   - Engine backend constructs composite string keys from the targets and aggressively filters the dataset using a highly performant `Set`, preserving the very first occurrence of a duplicate row.
 - Updated `NodePalette.tsx` to expose both nodes under the "Transform" category.
 - Updated `CustomNode.tsx` to automatically attach the appropriate Lucide icons (`ArrowDownAZ` and `CopyMinus`) based on the data node properties.
+
+---
+
+**Current Phase:** Phase 14 (Pipeline Versioning)
+
+**Completed Tasks:**
+- Overhauled the `Execution` model in MongoDB to include a `pipelineSnapshot` field (`{ nodes: [], edges: [] }`).
+- Modified `PipelineController.run()` to immediately extract the current layout configuration of a pipeline graph and embed it into the newly created `Execution` document before queuing it to BullMQ. This completely isolates the historical run from any future layout modifications, creating a true immutable snapshot.
+- Refactored `HistoryModal.tsx` in the frontend UI to display a dynamic badge showcasing the exact number of nodes and edges that were part of the immutable snapshot at the time of execution.
+- Addressed TypeScript stricter-mode validation warnings resulting from Express `req.params` parameter type changes in the newer version bumps.
+
