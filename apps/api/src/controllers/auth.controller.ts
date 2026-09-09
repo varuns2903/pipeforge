@@ -41,6 +41,10 @@ export class AuthController {
         res.status(401).json({ error: error.message });
         return;
       }
+      if (error.message.includes('Account locked')) {
+        res.status(423).json({ error: error.message });
+        return;
+      }
       next(error);
     }
   }

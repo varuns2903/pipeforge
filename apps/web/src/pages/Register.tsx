@@ -76,8 +76,11 @@ export function Register() {
                 className="block w-full px-4 py-2.5 bg-surface-2 border border-border-strong rounded-lg text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500 transition-colors"
                 placeholder="••••••••"
                 required
-                minLength={6}
+                minLength={8}
+                pattern="(?=.*[A-Za-z])(?=.*\d).+"
+                title="At least 8 characters, including a letter and a number"
               />
+              <p className="text-xs text-text-tertiary mt-1.5">At least 8 characters, with a letter and a number.</p>
             </div>
             
             <button

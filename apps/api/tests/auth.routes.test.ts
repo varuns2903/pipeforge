@@ -128,3 +128,40 @@ describe('Cookie-based auth', () => {
     expect(meRes.status).toBe(401);
   });
 });
+
+describe('Registration password policy', () => {
+  it('rejects a password shorter than 8 characters', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'shortpw@example.com', password: 'ab1', name: 'Short PW' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a password with no digit', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'nodigitpw@example.com', password: 'abcdefgh', name: 'No Digit' });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('Account lockout', () => {
+  const email = 'lockout@example.com';
+
+  beforeAll(async () => {
+    await request(app).post('/api/auth/register').send({ email, password: 'password123', name: 'Lockout Test' });
+  });
+
+  it('locks the account after 5 failed login attempts', async () => {
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app).post('/api/auth/login').send({ email, password: 'wrongpassword' });
+      expect(res.status).toBe(401);
+    }
+
+    // 6th attempt — even with the CORRECT password — should now be locked out.
+    const lockedRes = await request(app).post('/api/auth/login').send({ email, password: 'password123' });
+    expect(lockedRes.status).toBe(423);
+  });
+});
