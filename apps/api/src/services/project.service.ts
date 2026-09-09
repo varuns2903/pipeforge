@@ -8,7 +8,9 @@ export class ProjectService {
   }
 
   async list(ownerId: string) {
-    return Project.find({ ownerId }).sort({ updatedAt: -1 });
+    // Safety cap against unbounded scans; real cursor-based pagination is a
+    // separate, larger change (needs a frontend contract change too).
+    return Project.find({ ownerId }).sort({ updatedAt: -1 }).limit(200);
   }
 
   async getById(projectId: string, ownerId: string) {

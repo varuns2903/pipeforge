@@ -1,7 +1,7 @@
 import './config/env'; // must load first: populates process.env before other modules read it
 
 import mongoose from 'mongoose';
-import { app } from './app';
+import { app, logger } from './app';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import Redis from 'ioredis';
@@ -30,15 +30,15 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  console.log(`Socket connected: ${socket.id}`);
+  logger.info({ socketId: socket.id }, 'Socket connected');
   
   socket.on('subscribe_pipeline', (pipelineId) => {
     socket.join(`pipeline_${pipelineId}`);
-    console.log(`Socket ${socket.id} joined pipeline_${pipelineId}`);
+    logger.info({ socketId: socket.id, pipelineId }, 'Socket joined pipeline room');
   });
   
   socket.on('disconnect', () => {
-    console.log(`Socket disconnected: ${socket.id}`);
+    logger.info({ socketId: socket.id }, 'Socket disconnected');
   });
 });
 
@@ -54,19 +54,39 @@ redisSubscriber.on('message', (channel, message) => {
         io.to(`pipeline_${data.pipelineId}`).emit('execution_update', data);
       }
     } catch (err) {
-      console.error('Error parsing execution update:', err);
+      logger.error({ err }, 'Error parsing execution update');
     }
   }
 });
 
 mongoose.connect(MONGODB_URI)
   .then(() => {
-    console.log('Connected to MongoDB');
+    logger.info('Connected to MongoDB');
     httpServer.listen(PORT, () => {
-      console.log(`API server running on port ${PORT}`);
+      logger.info({ port: PORT }, 'API server running');
     });
   })
   .catch(err => {
-    console.error('MongoDB connection error:', err);
+    logger.error({ err }, 'MongoDB connection error');
     process.exit(1);
   });
+
+const shutdown = async (signal: string) => {
+  logger.info({ signal }, 'Shutting down API server gracefully');
+  try {
+    await new Promise<void>((resolve, reject) => {
+      httpServer.close(err => (err ? reject(err) : resolve()));
+    });
+    io.close();
+    await redisSubscriber.quit();
+    await mongoose.disconnect();
+    logger.info('API server shut down cleanly');
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err }, 'Error during shutdown');
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

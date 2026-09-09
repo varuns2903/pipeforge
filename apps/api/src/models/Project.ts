@@ -5,4 +5,6 @@ const projectSchema = new mongoose.Schema({
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
 
+projectSchema.index({ ownerId: 1 });
+
 export const Project = mongoose.model('Project', projectSchema);

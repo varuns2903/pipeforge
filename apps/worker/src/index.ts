@@ -4,37 +4,30 @@ import dotenv from 'dotenv';
 import path from 'path';
 import Redis from 'ioredis';
 import { PipelineEngine } from '@pipeforge/pipeline-engine';
+import { executionSchema, createLogger } from '@pipeforge/shared';
 
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pipeforge';
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6380', 10);
+const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
 
 const redisPublisher = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
 
-const executionSchema = new mongoose.Schema({
-  pipelineId: mongoose.Schema.Types.ObjectId,
-  projectId: mongoose.Schema.Types.ObjectId,
-  status: String,
-  startedAt: Date,
-  completedAt: Date,
-  results: mongoose.Schema.Types.Mixed,
-  error: String
-}, { timestamps: true });
-
 const Execution = mongoose.model('Execution', executionSchema);
+const logger = createLogger('worker');
 
 async function startWorker() {
   await mongoose.connect(MONGODB_URI);
-  console.log('Worker connected to MongoDB');
+  logger.info('Worker connected to MongoDB');
 
   const engine = new PipelineEngine();
 
   const worker = new Worker('pipeline-executions', async job => {
     const { executionId, pipeline } = job.data;
-    console.log(`[Job ${job.id}] Processing execution: ${executionId}`);
-    
+    logger.info({ jobId: job.id, executionId }, 'Processing execution');
+
     await Execution.findByIdAndUpdate(executionId, {
       status: 'RUNNING',
       startedAt: new Date()
@@ -62,23 +55,23 @@ async function startWorker() {
           publishUpdate({ type: 'NODE_ERROR', nodeId, error });
         }
       });
-      
+
       await Execution.findByIdAndUpdate(executionId, {
         status: 'COMPLETED',
         completedAt: new Date(),
         results
       });
-      
+
       publishUpdate({ type: 'STATUS', status: 'COMPLETED', results });
-      console.log(`[Job ${job.id}] Execution ${executionId} completed successfully`);
+      logger.info({ jobId: job.id, executionId }, 'Execution completed successfully');
     } catch (error: any) {
-      console.error(`[Job ${job.id}] Execution ${executionId} failed:`, error.message);
+      logger.error({ jobId: job.id, executionId, err: error }, 'Execution failed');
       await Execution.findByIdAndUpdate(executionId, {
         status: 'FAILED',
         completedAt: new Date(),
         error: error.message
       });
-      
+
       publishUpdate({ type: 'STATUS', status: 'FAILED', error: error.message });
       throw error;
     }
@@ -86,14 +79,35 @@ async function startWorker() {
     connection: {
       host: REDIS_HOST,
       port: REDIS_PORT
-    }
+    },
+    concurrency: WORKER_CONCURRENCY
   });
 
   worker.on('failed', (job, err) => {
-    console.error(`[Job ${job?.id}] Failed with error:`, err.message);
+    logger.error({ jobId: job?.id, err }, 'Job failed');
   });
 
-  console.log('Worker started, listening for pipeline executions...');
+  logger.info({ concurrency: WORKER_CONCURRENCY }, 'Worker started, listening for pipeline executions');
+
+  const shutdown = async (signal: string) => {
+    logger.info({ signal }, 'Shutting down worker gracefully');
+    try {
+      await worker.close(); // stops accepting new jobs, waits for active ones to finish
+      await redisPublisher.quit();
+      await mongoose.disconnect();
+      logger.info('Worker shut down cleanly');
+      process.exit(0);
+    } catch (err) {
+      logger.error({ err }, 'Error during shutdown');
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-startWorker().catch(console.error);
+startWorker().catch(err => {
+  logger.error({ err }, 'Fatal error starting worker');
+  process.exit(1);
+});

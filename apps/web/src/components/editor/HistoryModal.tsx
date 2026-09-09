@@ -39,10 +39,53 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
     // Get the last node's output, usually a csv-output or the final node executed
     const keys = Object.keys(results);
     if (keys.length === 0) return [];
-    
+
     // Find output node if exists
     const outputKey = keys.find(k => k.includes('output')) || keys[keys.length - 1];
     return results[outputKey] || [];
+  };
+
+  // Determine which node produced the final output so we know whether to
+  // export real CSV (for a csv-output node) or JSON (everything else).
+  const getFinalOutputNodeType = (run: any): string | null => {
+    if (!run?.results || !run?.pipelineSnapshot?.nodes) return null;
+    const keys = Object.keys(run.results);
+    if (keys.length === 0) return null;
+    const outputKey = keys.find(k => k.includes('output')) || keys[keys.length - 1];
+    const node = run.pipelineSnapshot.nodes.find((n: any) => n.id === outputKey);
+    return node?.data?.nodeType || null;
+  };
+
+  const toCsv = (rows: any[]): string => {
+    if (!rows || rows.length === 0) return '';
+    const columns = Object.keys(rows[0]);
+    const escape = (value: any) => {
+      const str = value === null || value === undefined
+        ? ''
+        : typeof value === 'object' ? JSON.stringify(value) : String(value);
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+    const lines = [columns.join(',')];
+    for (const row of rows) {
+      lines.push(columns.map(col => escape(row[col])).join(','));
+    }
+    return lines.join('\n');
+  };
+
+  const downloadOutput = (run: any) => {
+    const data = getFinalOutput(run.results);
+    const isCsv = getFinalOutputNodeType(run) === 'csv-output';
+    const content = isCsv ? toCsv(data) : JSON.stringify(data, null, 2);
+    const mime = isCsv ? 'text/csv' : 'application/json';
+    const ext = isCsv ? 'csv' : 'json';
+
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pipeforge_export_${run._id.slice(-6)}.${ext}`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -131,17 +174,11 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <div className="p-4 border-b border-border-subtle flex items-center justify-between bg-background shrink-0">
                       <h4 className="text-sm font-semibold text-text-primary">Final Output Data</h4>
-                      <button 
-                        onClick={() => {
-                          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(getFinalOutput(runDetail.results), null, 2));
-                          const dlAnchorElem = document.createElement('a');
-                          dlAnchorElem.setAttribute("href", dataStr);
-                          dlAnchorElem.setAttribute("download", `pipeforge_export_${runDetail._id.slice(-6)}.json`);
-                          dlAnchorElem.click();
-                        }}
+                      <button
+                        onClick={() => downloadOutput(runDetail)}
                         className="text-xs flex items-center gap-1.5 text-accent-500 hover:text-accent-400 bg-accent-500/10 px-3 py-1.5 rounded"
                       >
-                        <Download size={14} /> Export JSON
+                        <Download size={14} /> {getFinalOutputNodeType(runDetail) === 'csv-output' ? 'Export CSV' : 'Export JSON'}
                       </button>
                     </div>
                     

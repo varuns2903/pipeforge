@@ -7,4 +7,6 @@ const pipelineSchema = new mongoose.Schema({
   edges: { type: Array, default: [] }
 }, { timestamps: true });
 
+pipelineSchema.index({ projectId: 1 });
+
 export const Pipeline = mongoose.model('Pipeline', pipelineSchema);

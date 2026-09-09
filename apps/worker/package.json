@@ -14,5 +14,13 @@
   "devDependencies": {
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@pipeforge/pipeline-engine": "^1.0.0",
+    "@pipeforge/shared": "^1.0.0",
+    "bullmq": "^6.3.4",
+    "dotenv": "^17.4.2",
+    "ioredis": "^6.0.0",
+    "mongoose": "^9.9.5"
   }
 }

@@ -11,7 +11,9 @@ export class PipelineService {
 
   async list(projectId: string, ownerId: string) {
     await projectService.getById(projectId, ownerId);
-    return Pipeline.find({ projectId }).sort({ updatedAt: -1 });
+    // Safety cap against unbounded scans; real cursor-based pagination is a
+    // separate, larger change (needs a frontend contract change too).
+    return Pipeline.find({ projectId }).sort({ updatedAt: -1 }).limit(200);
   }
 
   async getById(pipelineId: string, projectId: string, ownerId: string) {
