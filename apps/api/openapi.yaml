@@ -1,0 +1,461 @@
+openapi: 3.0.3
+info:
+  title: PipeForge API
+  version: '1.0'
+  description: >
+    REST API for PipeForge — a visual data-processing pipeline builder.
+    Browser clients authenticate via an httpOnly cookie set on login/register;
+    non-browser clients may instead send `Authorization: Bearer <token>`.
+servers:
+  - url: /api
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        name: { type: string }
+        emailVerified: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Project:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        ownerId: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Pipeline:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        name: { type: string }
+        nodes:
+          type: array
+          items: { type: object }
+        edges:
+          type: array
+          items: { type: object }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Execution:
+      type: object
+      properties:
+        _id: { type: string }
+        pipelineId: { type: string }
+        projectId: { type: string }
+        status: { type: string, enum: [PENDING, RUNNING, COMPLETED, FAILED] }
+        pipelineSnapshot: { type: object }
+        results: { type: object }
+        error: { type: string }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        '200':
+          description: OK
+
+  /auth/register:
+    post:
+      summary: Create an account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, description: 'At least one letter and one number' }
+                name: { type: string }
+      responses:
+        '201':
+          description: Registered — sets the auth cookie and returns the user + token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  token: { type: string }
+        '400':
+          description: Validation error or email already in use
+
+  /auth/login:
+    post:
+      summary: Sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Signed in — sets the auth cookie and returns the user + token
+        '401':
+          description: Invalid credentials
+        '423':
+          description: Account locked after too many failed attempts
+
+  /auth/logout:
+    post:
+      summary: Sign out (clears the auth cookie)
+      security: []
+      responses:
+        '204': { description: Logged out }
+
+  /auth/me:
+    get:
+      summary: Get the current authenticated user
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/verify-email:
+    post:
+      summary: Verify an email address using the token from the verification email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '204': { description: Verified }
+        '400': { description: Token invalid or expired }
+
+  /auth/resend-verification:
+    post:
+      summary: Resend the verification email to the current user
+      responses:
+        '204': { description: Sent }
+        '400': { description: Email already verified }
+
+  /auth/forgot-password:
+    post:
+      summary: Request a password reset email
+      security: []
+      description: >
+        Always returns 204 whether or not the email is registered, to avoid
+        leaking which addresses have accounts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '204': { description: A reset email was sent, if the account exists }
+
+  /auth/reset-password:
+    post:
+      summary: Reset a password using the token from the reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        '204': { description: Password updated }
+        '400': { description: Token invalid or expired, or password fails policy }
+
+  /projects:
+    get:
+      summary: List the current user's projects
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Project' }
+    post:
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties: { name: { type: string } }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Project' }
+
+  /projects/{projectId}:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: Get a project
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Rename a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties: { name: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Soft-delete a project (recoverable via restore)
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/restore:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: Restore a soft-deleted project
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/pipelines:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: List pipelines in a project
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Pipeline' }
+    post:
+      summary: Create a pipeline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties: { name: { type: string } }
+      responses:
+        '201':
+          description: Created
+          content: { application/json: { schema: { $ref: '#/components/schemas/Pipeline' } } }
+
+  /projects/{projectId}/pipelines/{pipelineId}:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: Get a pipeline
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Pipeline' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Update a pipeline's name, nodes, and/or edges
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                nodes: { type: array, items: { type: object } }
+                edges: { type: array, items: { type: object } }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Pipeline' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Soft-delete a pipeline (recoverable via restore)
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/pipelines/{pipelineId}/restore:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: Restore a soft-deleted pipeline
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Pipeline' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/pipelines/{pipelineId}/validate:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: Validate a pipeline's DAG structure and node configuration
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isValid: { type: boolean }
+                  errors: { type: array, items: { type: string } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/pipelines/{pipelineId}/run:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: Queue an asynchronous execution of the pipeline
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  status: { type: string }
+        '400': { description: Pipeline failed validation }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/pipelines/{pipelineId}/executions:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: List recent executions of a pipeline (most recent 50, no results payload)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Execution' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/pipelines/{pipelineId}/executions/{executionId}:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+      - { name: executionId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: Get a single execution, including its results
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Execution' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /files/upload:
+    post:
+      summary: Upload a .csv or .json dataset (used as a pipeline's csv-input/json-input source)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filePath: { type: string, description: 'Pass this as a csv-input/json-input node''s filePath config' }
+                  originalName: { type: string }
+                  size: { type: integer }
+        '400': { description: 'No file, wrong type, or over the size limit' }

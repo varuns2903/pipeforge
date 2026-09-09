@@ -54,3 +54,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 `docker-compose.yml` (no `.prod`) is dev-only — it just brings up MongoDB/Redis so you can run each app locally with `npm run dev`.
 
 Required environment variables are documented in `.env.example` (API/worker) and `apps/web/.env.example` (frontend). `JWT_SECRET` has no default and the API will refuse to start without it.
+
+## API Documentation
+
+Interactive API docs (Swagger UI) are served by the running API at `/api/docs` (e.g. `http://localhost:3000/api/docs`), generated from `apps/api/openapi.yaml`. The raw spec is also available as JSON at `/api/openapi.json`.

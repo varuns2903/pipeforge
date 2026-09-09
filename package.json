@@ -38,6 +38,7 @@
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
-    "msgpackr-extract@3.0.4": true
+    "msgpackr-extract@3.0.4": true,
+    "@scarf/scarf": false
   }
 }

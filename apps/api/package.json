@@ -19,10 +19,12 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/js-yaml": "^4.0.9",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.2.0",
     "@types/nodemailer": "^8.0.1",
     "@types/supertest": "^7.2.1",
+    "@types/swagger-ui-express": "^4.1.8",
     "@types/uuid": "^10.0.0",
     "supertest": "^7.2.2",
     "vitest": "^5.0.0"
@@ -35,10 +37,12 @@
     "cookie-parser": "^1.4.7",
     "express-rate-limit": "^8.7.0",
     "ioredis": "^6.0.0",
+    "js-yaml": "^5.4.1",
     "multer": "^2.3.0",
     "nodemailer": "^10.0.1",
     "pino-http": "^11.0.0",
     "socket.io": "^4.8.3",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^14.0.2"
   }
 }
