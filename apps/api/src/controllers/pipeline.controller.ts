@@ -67,6 +67,16 @@ export class PipelineController {
     }
   }
 
+  async restore(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const pipeline = await pipelineService.restore((req.params.pipelineId as string), (req.params.projectId as string), req.user.id);
+      res.json(mapToDTO(pipeline));
+    } catch (err: any) {
+      if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
+      next(err);
+    }
+  }
+
   async validate(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const pipeline = await pipelineService.getById((req.params.pipelineId as string), (req.params.projectId as string), req.user.id);

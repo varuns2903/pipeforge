@@ -90,7 +90,60 @@ describe('Project & Pipeline Endpoints', () => {
     const res = await request(app)
       .delete(`/api/projects/${projectId}`)
       .set('Authorization', `Bearer ${token}`);
-    
+
     expect(res.status).toBe(204);
+  });
+});
+
+describe('Soft delete / restore', () => {
+  it('a deleted project disappears from the list and 404s on direct access, but restore brings it back', async () => {
+    const createRes = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Soft Delete Me' });
+    const softDeleteProjectId = createRes.body.id;
+
+    await request(app).delete(`/api/projects/${softDeleteProjectId}`).set('Authorization', `Bearer ${token}`);
+
+    const listRes = await request(app).get('/api/projects').set('Authorization', `Bearer ${token}`);
+    expect(listRes.body.find((p: any) => p.id === softDeleteProjectId)).toBeUndefined();
+
+    const getRes = await request(app).get(`/api/projects/${softDeleteProjectId}`).set('Authorization', `Bearer ${token}`);
+    expect(getRes.status).toBe(404);
+
+    const restoreRes = await request(app).post(`/api/projects/${softDeleteProjectId}/restore`).set('Authorization', `Bearer ${token}`);
+    expect(restoreRes.status).toBe(200);
+    expect(restoreRes.body.id).toBe(softDeleteProjectId);
+
+    const getAfterRestore = await request(app).get(`/api/projects/${softDeleteProjectId}`).set('Authorization', `Bearer ${token}`);
+    expect(getAfterRestore.status).toBe(200);
+  });
+
+  it('a deleted pipeline disappears from the list and 404s on direct access, but restore brings it back', async () => {
+    const projectRes = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Pipeline Soft Delete Project' });
+    const pId = projectRes.body.id;
+
+    const pipelineRes = await request(app)
+      .post(`/api/projects/${pId}/pipelines`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Soft Delete Pipeline' });
+    const softDeletePipelineId = pipelineRes.body.id;
+
+    await request(app).delete(`/api/projects/${pId}/pipelines/${softDeletePipelineId}`).set('Authorization', `Bearer ${token}`);
+
+    const listRes = await request(app).get(`/api/projects/${pId}/pipelines`).set('Authorization', `Bearer ${token}`);
+    expect(listRes.body.length).toBe(0);
+
+    const getRes = await request(app).get(`/api/projects/${pId}/pipelines/${softDeletePipelineId}`).set('Authorization', `Bearer ${token}`);
+    expect(getRes.status).toBe(404);
+
+    const restoreRes = await request(app).post(`/api/projects/${pId}/pipelines/${softDeletePipelineId}/restore`).set('Authorization', `Bearer ${token}`);
+    expect(restoreRes.status).toBe(200);
+
+    const getAfterRestore = await request(app).get(`/api/projects/${pId}/pipelines/${softDeletePipelineId}`).set('Authorization', `Bearer ${token}`);
+    expect(getAfterRestore.status).toBe(200);
   });
 });

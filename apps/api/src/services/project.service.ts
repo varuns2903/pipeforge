@@ -10,18 +10,18 @@ export class ProjectService {
   async list(ownerId: string) {
     // Safety cap against unbounded scans; real cursor-based pagination is a
     // separate, larger change (needs a frontend contract change too).
-    return Project.find({ ownerId }).sort({ updatedAt: -1 }).limit(200);
+    return Project.find({ ownerId, deletedAt: null }).sort({ updatedAt: -1 }).limit(200);
   }
 
   async getById(projectId: string, ownerId: string) {
-    const project = await Project.findOne({ _id: projectId, ownerId });
+    const project = await Project.findOne({ _id: projectId, ownerId, deletedAt: null });
     if (!project) throw new Error('Project not found');
     return project;
   }
 
   async update(projectId: string, ownerId: string, name: string) {
     const project = await Project.findOneAndUpdate(
-      { _id: projectId, ownerId },
+      { _id: projectId, ownerId, deletedAt: null },
       { name },
       { new: true }
     );
@@ -29,9 +29,26 @@ export class ProjectService {
     return project;
   }
 
+  // Soft delete: the project (and, transitively, its pipelines/executions —
+  // they're only reachable through this project's ownership check) becomes
+  // invisible and inaccessible, but stays recoverable via restore().
   async delete(projectId: string, ownerId: string) {
-    const project = await Project.findOneAndDelete({ _id: projectId, ownerId });
+    const project = await Project.findOneAndUpdate(
+      { _id: projectId, ownerId, deletedAt: null },
+      { deletedAt: new Date() },
+      { new: true }
+    );
     if (!project) throw new Error('Project not found');
+    return project;
+  }
+
+  async restore(projectId: string, ownerId: string) {
+    const project = await Project.findOneAndUpdate(
+      { _id: projectId, ownerId, deletedAt: { $ne: null } },
+      { deletedAt: null },
+      { new: true }
+    );
+    if (!project) throw new Error('Deleted project not found');
     return project;
   }
 }

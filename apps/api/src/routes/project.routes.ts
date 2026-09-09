@@ -28,6 +28,7 @@ projectRouter.get('/', projectController.list);
 projectRouter.get('/:projectId', projectController.get);
 projectRouter.put('/:projectId', nameValidation, validate, projectController.update);
 projectRouter.delete('/:projectId', projectController.delete);
+projectRouter.post('/:projectId/restore', projectController.restore);
 
 // Pipeline Routes (nested)
 projectRouter.post('/:projectId/pipelines', nameValidation, validate, pipelineController.create);
@@ -39,3 +40,4 @@ projectRouter.get('/:projectId/pipelines/:pipelineId/executions', executionContr
 projectRouter.get('/:projectId/pipelines/:pipelineId/executions/:executionId', executionController.getExecution);
 projectRouter.put('/:projectId/pipelines/:pipelineId', pipelineController.update);
 projectRouter.delete('/:projectId/pipelines/:pipelineId', pipelineController.delete);
+projectRouter.post('/:projectId/pipelines/:pipelineId/restore', pipelineController.restore);

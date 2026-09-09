@@ -54,6 +54,16 @@ export class ProjectController {
       next(err);
     }
   }
+
+  async restore(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const project = await projectService.restore((req.params.projectId as string), req.user.id);
+      res.json(mapToDTO(project));
+    } catch (err: any) {
+      if (err.message === 'Deleted project not found') return res.status(404).json({ error: err.message });
+      next(err);
+    }
+  }
 }
 
 export const projectController = new ProjectController();
