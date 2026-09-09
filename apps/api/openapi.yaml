@@ -406,6 +406,7 @@ paths:
                   status: { type: string }
         '400': { description: Pipeline failed validation }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { description: 'Too many active executions for this user (MAX_CONCURRENT_EXECUTIONS_PER_USER)' }
 
   /projects/{projectId}/pipelines/{pipelineId}/executions:
     parameters:
@@ -458,4 +459,5 @@ paths:
                   filePath: { type: string, description: 'Pass this as a csv-input/json-input node''s filePath config' }
                   originalName: { type: string }
                   size: { type: integer }
-        '400': { description: 'No file, wrong type, or over the size limit' }
+        '400': { description: 'No file, wrong type, or over the per-file size limit' }
+        '413': { description: 'Would exceed the user''s total storage quota (MAX_USER_STORAGE_MB)' }

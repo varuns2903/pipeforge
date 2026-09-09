@@ -38,3 +38,8 @@ export const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
 export const SMTP_USER = process.env.SMTP_USER;
 export const SMTP_PASS = process.env.SMTP_PASS;
 export const MAIL_FROM = process.env.MAIL_FROM || 'PipeForge <no-reply@pipeforge.local>';
+
+// Per-user quotas — reasonable defaults, no plan tiers. Both configurable via
+// env so they can be tuned without a code change as real usage comes in.
+export const MAX_USER_STORAGE_MB = parseFloat(process.env.MAX_USER_STORAGE_MB || '500');
+export const MAX_CONCURRENT_EXECUTIONS_PER_USER = parseInt(process.env.MAX_CONCURRENT_EXECUTIONS_PER_USER || '5', 10);

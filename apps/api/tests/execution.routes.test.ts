@@ -24,6 +24,7 @@ beforeAll(async () => {
 
   const userA = await request(app).post('/api/auth/register').send({ email: 'owner@example.com', password: 'password123', name: 'Owner' });
   tokenA = userA.body.token;
+  const ownerId = userA.body.user.id;
 
   const userB = await request(app).post('/api/auth/register').send({ email: 'intruder@example.com', password: 'password123', name: 'Intruder' });
   tokenB = userB.body.token;
@@ -43,6 +44,7 @@ beforeAll(async () => {
   const execution = await Execution.create({
     pipelineId,
     projectId,
+    ownerId,
     status: 'COMPLETED',
     results: { secret: 'owner-only-data' }
   });

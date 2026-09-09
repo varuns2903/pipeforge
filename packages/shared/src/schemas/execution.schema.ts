@@ -7,6 +7,10 @@ import mongoose from 'mongoose';
 export const executionSchema = new mongoose.Schema({
   pipelineId: { type: mongoose.Schema.Types.ObjectId, ref: 'Pipeline', required: true },
   projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+  // Denormalized from the project's owner at creation time — lets the api
+  // check "how many active executions does this user have" (for the
+  // per-user concurrency quota) without a join through Project on every run.
+  ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   pipelineSnapshot: { type: mongoose.Schema.Types.Mixed }, // { nodes: [], edges: [] }
   status: { type: String, enum: ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED'], default: 'PENDING' },
   startedAt: { type: Date },
@@ -17,3 +21,4 @@ export const executionSchema = new mongoose.Schema({
 
 executionSchema.index({ pipelineId: 1, createdAt: -1 });
 executionSchema.index({ projectId: 1 });
+executionSchema.index({ ownerId: 1, status: 1 });

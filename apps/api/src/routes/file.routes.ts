@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
+import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
-import { requireAuth } from '../middleware/auth.middleware';
+import { requireAuth, AuthRequest } from '../middleware/auth.middleware';
+import { File } from '../models/File';
+import { MAX_USER_STORAGE_MB } from '../config/env';
 import fs from 'fs';
 
 const router = Router();
@@ -18,6 +21,7 @@ const storage = multer.diskStorage({
 });
 
 const MAX_FILE_SIZE_MB = Number(process.env.MAX_FILE_SIZE_MB) || 50;
+const MAX_USER_STORAGE_BYTES = MAX_USER_STORAGE_MB * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.csv', '.json']);
 
 const upload = multer({
@@ -31,14 +35,37 @@ const upload = multer({
   }
 });
 
-router.post('/upload', requireAuth, (req, res) => {
-  upload.single('file')(req, res, (err: any) => {
+router.post('/upload', requireAuth, (req: AuthRequest, res) => {
+  upload.single('file')(req, res, async (err: any) => {
     if (err) {
       return res.status(400).json({ error: err.message || 'Upload failed' });
     }
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
+
+    // Storage quota is checked after the write (multer needs to see the file
+    // to know its size) — if it pushes the user over quota, delete it again
+    // rather than leaving an orphaned file with no File record.
+    const { _sum } = (await File.aggregate([
+      { $match: { ownerId: new mongoose.Types.ObjectId(req.user.id) } },
+      { $group: { _id: null, _sum: { $sum: '$size' } } }
+    ]))[0] || { _sum: 0 };
+
+    if (_sum + req.file.size > MAX_USER_STORAGE_BYTES) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(413).json({
+        error: `Uploading this file would exceed your ${MAX_USER_STORAGE_MB}MB storage quota.`
+      });
+    }
+
+    await File.create({
+      ownerId: req.user.id,
+      filePath: `/uploads/${req.file.filename}`,
+      originalName: req.file.originalname,
+      size: req.file.size
+    });
+
     const filePath = `/uploads/${req.file.filename}`;
     res.json({ filePath, originalName: req.file.originalname, size: req.file.size });
   });
