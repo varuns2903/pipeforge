@@ -14,7 +14,7 @@ It features a React frontend with a visual node editor, a Node.js/Express API, M
 - Authentication (JWT based)
 - Project and Pipeline CRUD
 - Visual Pipeline Editor (React Flow)
-- Node types: CSV/JSON Input, Filter, Select/Rename Columns, Sort, Deduplicate, Aggregate, CSV/JSON Output
+- Node types: CSV/JSON Input, Filter, Select/Rename Columns, Sort, Deduplicate, Aggregate, Join, Fill Nulls, Cast Type, CSV/JSON Output
 - Pipeline Validation (DAG constraints, configuration completeness)
 - Asynchronous Job Execution Engine (BullMQ + Redis)
 - Real-time Execution Monitoring (WebSockets)
@@ -23,7 +23,7 @@ It features a React frontend with a visual node editor, a Node.js/Express API, M
 - Pipeline versioning
 
 ### Out of Scope for MVP
-- Advanced nodes (Joins, Loops)
+- Loop/iteration nodes
 - Third-party data sources (Postgres, S3, APIs)
 - Collaboration and advanced RBAC
 - AI-assisted pipeline generation
@@ -58,3 +58,21 @@ Required environment variables are documented in `.env.example` (API/worker) and
 ## API Documentation
 
 Interactive API docs (Swagger UI) are served by the running API at `/api/docs` (e.g. `http://localhost:3000/api/docs`), generated from `apps/api/openapi.yaml`. The raw spec is also available as JSON at `/api/openapi.json`.
+
+## Testing
+
+Unit/integration tests live alongside each package (`npm test -w @pipeforge/api`, `-w @pipeforge/pipeline-engine`) and run against real MongoDB/Redis, not mocks — bring up `docker-compose.yml` first.
+
+End-to-end tests (`tests/e2e`, Playwright) exercise the full stack through a real browser: register → create a project/pipeline → drag-and-drop nodes onto the canvas → connect and configure them → run → watch the execution complete over the real Socket.IO connection → view filtered results in history → export CSV. They run against the whole stack already running (not started by Playwright itself, since it's five separate processes):
+
+```bash
+docker compose up -d                              # MongoDB + Redis
+npm run dev -w @pipeforge/api                      # in one terminal
+npm run dev -w @pipeforge/worker                   # in another
+npm run dev -w @pipeforge/web                      # in another
+
+npx playwright install chromium --with-deps         # first time only
+npm run test:e2e
+```
+
+If the web dev server isn't on the default `5173` (e.g. that port's already in use), point the API's `WEB_URL` and the tests' `E2E_WEB_URL` at wherever it actually landed. CI (`.github/workflows/ci.yml`, `e2e` job) does this automatically against fresh service containers on every push/PR.

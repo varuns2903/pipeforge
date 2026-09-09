@@ -8,7 +8,8 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:e2e": "npm test -w @pipeforge/e2e-tests"
   },
   "keywords": [],
   "author": "",
@@ -17,7 +18,8 @@
   "private": "true",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "tests/e2e"
   ],
   "devDependencies": {
     "@types/node": "^26.4.1",

@@ -81,3 +81,78 @@ jobs:
 
       - name: Build web image
         run: docker build -f apps/web/Dockerfile -t pipeforge-web:ci .
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    services:
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6380:6379
+
+    env:
+      MONGODB_URI: mongodb://localhost:27017/pipeforge_e2e
+      REDIS_HOST: localhost
+      REDIS_PORT: 6380
+      JWT_SECRET: ci_test_secret_do_not_use_in_prod
+      WEB_URL: http://localhost:5173
+      VITE_API_URL: http://localhost:3000
+      PORT: 3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build shared packages
+        run: |
+          npm run build -w @pipeforge/shared
+          npm run build -w @pipeforge/pipeline-engine
+
+      - run: npx playwright install --with-deps chromium
+        working-directory: tests/e2e
+
+      - name: Start api, worker, web in the background
+        run: |
+          npx tsx apps/api/src/index.ts > api.log 2>&1 &
+          npx tsx apps/worker/src/index.ts > worker.log 2>&1 &
+          npm run dev -w @pipeforge/web -- --port 5173 > web.log 2>&1 &
+
+      - name: Wait for the stack to be ready
+        run: |
+          for url in http://localhost:3000/healthz http://localhost:5173; do
+            echo "Waiting for $url..."
+            timeout 60 bash -c "until curl -sf $url > /dev/null; do sleep 1; done"
+          done
+
+      - name: Run E2E tests
+        run: npm test
+        working-directory: tests/e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            tests/e2e/playwright-report/
+            tests/e2e/test-results/
+          retention-days: 7
+
+      - name: Show service logs on failure
+        if: failure()
+        run: |
+          echo "--- api.log ---"; cat api.log || true
+          echo "--- worker.log ---"; cat worker.log || true
+          echo "--- web.log ---"; cat web.log || true
