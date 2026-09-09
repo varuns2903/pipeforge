@@ -49,6 +49,12 @@ components:
         edges:
           type: array
           items: { type: object }
+        schedule:
+          type: object
+          properties:
+            cronExpression: { type: string, nullable: true }
+            timezone: { type: string, nullable: true }
+            enabled: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     Execution:
@@ -364,6 +370,41 @@ paths:
       - { name: pipelineId, in: path, required: true, schema: { type: string } }
     post:
       summary: Restore a soft-deleted pipeline
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Pipeline' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/pipelines/{pipelineId}/schedule:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+    put:
+      summary: Set (or replace) a recurring cron schedule for this pipeline
+      description: >
+        Runs the pipeline automatically on the given cron schedule via a
+        BullMQ job scheduler. Each scheduled firing looks up the pipeline
+        fresh, so edits made after scheduling are picked up automatically.
+        Setting a new schedule replaces any existing one for this pipeline.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cronExpression]
+              properties:
+                cronExpression: { type: string, description: 'Standard 5-field cron syntax, e.g. "0 * * * *"' }
+                timezone: { type: string, description: 'e.g. "America/New_York"; defaults to UTC' }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Pipeline' } } }
+        '400': { description: Invalid cron expression }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Remove this pipeline's recurring schedule
       responses:
         '200':
           description: OK

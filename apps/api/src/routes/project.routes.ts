@@ -41,3 +41,5 @@ projectRouter.get('/:projectId/pipelines/:pipelineId/executions/:executionId', e
 projectRouter.put('/:projectId/pipelines/:pipelineId', pipelineController.update);
 projectRouter.delete('/:projectId/pipelines/:pipelineId', pipelineController.delete);
 projectRouter.post('/:projectId/pipelines/:pipelineId/restore', pipelineController.restore);
+projectRouter.put('/:projectId/pipelines/:pipelineId/schedule', pipelineController.setSchedule);
+projectRouter.delete('/:projectId/pipelines/:pipelineId/schedule', pipelineController.clearSchedule);

@@ -12,6 +12,11 @@ const mapToDTO = (doc: any) => ({
   name: doc.name,
   nodes: doc.nodes,
   edges: doc.edges,
+  schedule: doc.schedule ? {
+    cronExpression: doc.schedule.cronExpression ?? null,
+    timezone: doc.schedule.timezone ?? null,
+    enabled: !!doc.schedule.enabled,
+  } : { cronExpression: null, timezone: null, enabled: false },
   createdAt: doc.createdAt.toISOString(),
   updatedAt: doc.updatedAt.toISOString(),
 });
@@ -71,6 +76,35 @@ export class PipelineController {
   async restore(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const pipeline = await pipelineService.restore((req.params.pipelineId as string), (req.params.projectId as string), req.user.id);
+      res.json(mapToDTO(pipeline));
+    } catch (err: any) {
+      if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
+      next(err);
+    }
+  }
+
+  async setSchedule(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { cronExpression, timezone } = req.body;
+      if (!cronExpression) {
+        return res.status(400).json({ error: 'cronExpression is required' });
+      }
+      const pipeline = await pipelineService.setSchedule(
+        (req.params.pipelineId as string), (req.params.projectId as string), req.user.id, cronExpression, timezone
+      );
+      res.json(mapToDTO(pipeline));
+    } catch (err: any) {
+      if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
+      if (err.message.startsWith('Invalid cron expression')) return res.status(400).json({ error: err.message });
+      next(err);
+    }
+  }
+
+  async clearSchedule(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const pipeline = await pipelineService.clearSchedule(
+        (req.params.pipelineId as string), (req.params.projectId as string), req.user.id
+      );
       res.json(mapToDTO(pipeline));
     } catch (err: any) {
       if (err.message.includes('not found')) return res.status(404).json({ error: err.message });

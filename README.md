@@ -21,6 +21,7 @@ It features a React frontend with a visual node editor, a Node.js/Express API, M
 - File upload/download management
 - Execution history and result persistence
 - Pipeline versioning
+- Scheduled execution (cron)
 
 ### Out of Scope for MVP
 - Loop/iteration nodes
@@ -28,7 +29,6 @@ It features a React frontend with a visual node editor, a Node.js/Express API, M
 - Collaboration and advanced RBAC
 - AI-assisted pipeline generation
 - OpenTelemetry and complex observability
-- Scheduled execution (Cron)
 
 ## Setup and Development
 

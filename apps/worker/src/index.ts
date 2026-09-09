@@ -3,8 +3,8 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
 import Redis from 'ioredis';
-import { PipelineEngine } from '@pipeforge/pipeline-engine';
-import { executionSchema, createLogger } from '@pipeforge/shared';
+import { PipelineEngine, PipelineValidator } from '@pipeforge/pipeline-engine';
+import { executionSchema, pipelineSchema, createLogger } from '@pipeforge/shared';
 
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
@@ -16,6 +16,7 @@ const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
 const redisPublisher = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
 
 const Execution = mongoose.model('Execution', executionSchema);
+const Pipeline = mongoose.model('Pipeline', pipelineSchema);
 const logger = createLogger('worker');
 
 async function startWorker() {
@@ -24,9 +25,8 @@ async function startWorker() {
 
   const engine = new PipelineEngine();
 
-  const worker = new Worker('pipeline-executions', async job => {
-    const { executionId, pipeline } = job.data;
-    logger.info({ jobId: job.id, executionId }, 'Processing execution');
+  const runPipeline = async (jobId: string | undefined, executionId: string, pipeline: any) => {
+    logger.info({ jobId, executionId }, 'Processing execution');
 
     await Execution.findByIdAndUpdate(executionId, {
       status: 'RUNNING',
@@ -63,9 +63,9 @@ async function startWorker() {
       });
 
       publishUpdate({ type: 'STATUS', status: 'COMPLETED', results });
-      logger.info({ jobId: job.id, executionId }, 'Execution completed successfully');
+      logger.info({ jobId, executionId }, 'Execution completed successfully');
     } catch (error: any) {
-      logger.error({ jobId: job.id, executionId, err: error }, 'Execution failed');
+      logger.error({ jobId, executionId, err: error }, 'Execution failed');
       await Execution.findByIdAndUpdate(executionId, {
         status: 'FAILED',
         completedAt: new Date(),
@@ -74,6 +74,40 @@ async function startWorker() {
 
       publishUpdate({ type: 'STATUS', status: 'FAILED', error: error.message });
       throw error;
+    }
+  };
+
+  const worker = new Worker('pipeline-executions', async job => {
+    if (job.name === 'scheduled-execution') {
+      // A cron schedule fired — unlike a manual run, there's no HTTP request
+      // that already created the Execution record, so do that here. Fetch
+      // the pipeline fresh (not a snapshot) so edits since the schedule was
+      // set are picked up automatically.
+      const { pipelineId, projectId, ownerId } = job.data;
+      const pipeline = await Pipeline.findOne({ _id: pipelineId, projectId, deletedAt: null });
+      if (!pipeline) {
+        logger.warn({ jobId: job.id, pipelineId }, 'Scheduled execution skipped: pipeline not found or deleted');
+        return;
+      }
+
+      const validation = new PipelineValidator().validate(pipeline);
+      if (!validation.isValid) {
+        logger.warn({ jobId: job.id, pipelineId, errors: validation.errors }, 'Scheduled execution skipped: pipeline invalid');
+        return;
+      }
+
+      const execution = await Execution.create({
+        pipelineId: pipeline._id,
+        projectId: pipeline.projectId,
+        ownerId,
+        pipelineSnapshot: { nodes: pipeline.nodes, edges: pipeline.edges },
+        status: 'PENDING'
+      });
+
+      await runPipeline(job.id, execution._id.toString(), pipeline);
+    } else {
+      const { executionId, pipeline } = job.data;
+      await runPipeline(job.id, executionId, pipeline);
     }
   }, {
     connection: {
