@@ -33,6 +33,7 @@ services:
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CONNECTION_ENCRYPTION_KEY: ${CONNECTION_ENCRYPTION_KEY:?CONNECTION_ENCRYPTION_KEY must be set in .env}
       WEB_URL: ${WEB_URL:-http://localhost:5173}
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
     volumes:
@@ -52,6 +53,7 @@ services:
       MONGODB_URI: mongodb://mongodb:27017/pipeforge
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      CONNECTION_ENCRYPTION_KEY: ${CONNECTION_ENCRYPTION_KEY:?CONNECTION_ENCRYPTION_KEY must be set in .env}
     volumes:
       - uploads_data:/repo/uploads
     restart: unless-stopped

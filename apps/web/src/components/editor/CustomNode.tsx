@@ -1,10 +1,13 @@
 import { Handle, Position } from '@xyflow/react';
 import { useDirection } from './DirectionContext';
-import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle } from 'lucide-react';
+import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe } from 'lucide-react';
 
 const icons: Record<string, any> = {
   'csv-input': Database,
   'json-input': Database,
+  'postgres-input': Database,
+  's3-input': Cloud,
+  'api-input': Globe,
   'filter': Filter,
   'select-columns': Settings,
   'rename-columns': Settings,

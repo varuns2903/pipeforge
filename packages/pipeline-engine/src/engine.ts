@@ -4,6 +4,8 @@ import { parse } from 'csv-parse';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Client as PgClient } from 'pg';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
 // The engine holds every node's full output in memory for the duration of a
 // run (context: ExecutionContext), so a dataset with unbounded rows can OOM
@@ -184,6 +186,117 @@ export class PipelineEngine {
         }
         const parsed = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
         const rows = Array.isArray(parsed) ? parsed : [parsed];
+        if (rows.length > MAX_ROWS) {
+          throw new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`);
+        }
+        return rows;
+      }
+
+      // The three connector node types below expect config to already carry
+      // resolved, plaintext credentials (host/user/password, access keys,
+      // API tokens) — the engine itself never touches encrypted credentials
+      // or a database of saved connections. It's the caller's job (the
+      // worker, which has DB access) to resolve a node's `connectionId`
+      // into these fields before calling execute(). This keeps the engine
+      // decoupled from Mongo/encryption entirely.
+
+      case 'postgres-input': {
+        if (!config.host || !config.database || !config.user || !config.query) {
+          throw new Error('postgres-input requires host, database, user, and query');
+        }
+        const client = new PgClient({
+          host: config.host,
+          port: config.port || 5432,
+          database: config.database,
+          user: config.user,
+          password: config.password,
+          ssl: config.ssl ? { rejectUnauthorized: false } : undefined,
+          connectionTimeoutMillis: 10_000,
+        });
+        await client.connect();
+        try {
+          const result = await client.query(config.query);
+          if (result.rows.length > MAX_ROWS) {
+            throw new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`);
+          }
+          return result.rows;
+        } finally {
+          await client.end();
+        }
+      }
+
+      case 's3-input': {
+        if (!config.bucket || !config.region || !config.key || !config.accessKeyId || !config.secretAccessKey) {
+          throw new Error('s3-input requires bucket, region, key, accessKeyId, and secretAccessKey');
+        }
+        const s3 = new S3Client({
+          region: config.region,
+          credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+        });
+        const response = await s3.send(new GetObjectCommand({ Bucket: config.bucket, Key: config.key }));
+        if (!response.Body) throw new Error(`S3 object has no body: s3://${config.bucket}/${config.key}`);
+
+        if (config.format === 'json') {
+          const text = await response.Body.transformToString();
+          const parsed = JSON.parse(text);
+          const rows = Array.isArray(parsed) ? parsed : [parsed];
+          if (rows.length > MAX_ROWS) {
+            throw new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`);
+          }
+          return rows;
+        }
+
+        // Default: CSV, streamed through the same parser/cap as csv-input.
+        return new Promise((resolve, reject) => {
+          const results: any[] = [];
+          const stream = (response.Body as any).pipe(parse({
+            columns: true,
+            skip_empty_lines: true,
+            cast: (value: string) => {
+              if (value === 'true') return true;
+              if (value === 'false') return false;
+              if (value.trim() !== '' && !isNaN(Number(value))) return Number(value);
+              return value;
+            }
+          }));
+          stream
+            .on('data', (data: any) => {
+              results.push(data);
+              if (results.length > MAX_ROWS) {
+                stream.destroy();
+                reject(new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`));
+              }
+            })
+            .on('close', () => {
+              if (results.length <= MAX_ROWS) resolve(results);
+            })
+            .on('error', (err: Error) => reject(err));
+        });
+      }
+
+      case 'api-input': {
+        if (!config.baseUrl) {
+          throw new Error('api-input requires a baseUrl');
+        }
+        const url = config.path ? new URL(config.path, config.baseUrl).toString() : config.baseUrl;
+        const headers: Record<string, string> = { ...(config.headers || {}) };
+        if (config.authType === 'bearer' && config.token) {
+          headers['Authorization'] = `Bearer ${config.token}`;
+        } else if (config.authType === 'header' && config.headerName && config.token) {
+          headers[config.headerName] = config.token;
+        }
+
+        const response = await fetch(url, { method: config.method || 'GET', headers });
+        if (!response.ok) {
+          throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        }
+        const data = await response.json();
+        // Optional dot-path into the response to find the row array, e.g.
+        // "data.items" for { data: { items: [...] } }.
+        const extracted = config.dataPath
+          ? String(config.dataPath).split('.').reduce((acc: any, key: string) => acc?.[key], data)
+          : data;
+        const rows = Array.isArray(extracted) ? extracted : [extracted];
         if (rows.length > MAX_ROWS) {
           throw new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`);
         }

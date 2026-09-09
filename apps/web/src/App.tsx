@@ -7,6 +7,7 @@ import { VerifyEmail } from './pages/VerifyEmail';
 import { Dashboard } from './pages/Dashboard';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { PipelineEditor } from './pages/PipelineEditor';
+import { Connections } from './pages/Connections';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 
@@ -25,6 +26,7 @@ function App() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/projects/:projectId" element={<ProjectDetail />} />
+            <Route path="/connections" element={<Connections />} />
           </Route>
           
           {/* Fullscreen Editor Route */}

@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Settings2, Trash2, Upload, X } from 'lucide-react';
 import { Database } from 'lucide-react';
 import { api } from '../../lib/api';
+
+interface Connection {
+  id: string;
+  name: string;
+  type: 'postgres' | 's3' | 'api';
+}
 
 export function ConfigPanel({ selectedNode, setNodes, setEdges }: { selectedNode: any, setNodes: any, setEdges: any }) {
   const [config, setConfig] = useState<any>({});
@@ -12,6 +19,13 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges }: { selectedNode
       setConfig(selectedNode.data.config || {});
     }
   }, [selectedNode]);
+
+  const isConnectorNode = ['postgres-input', 's3-input', 'api-input'].includes(selectedNode?.data?.nodeType);
+  const { data: connections } = useQuery<Connection[]>({
+    queryKey: ['connections'],
+    queryFn: async () => (await api.get('/connections')).data,
+    enabled: isConnectorNode,
+  });
 
   if (!selectedNode) {
     return null;
@@ -141,6 +155,123 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges }: { selectedNode
                 placeholder="/uploads/my-file.json"
               />
               <p className="text-xs text-text-tertiary mt-2">Enter file path of uploaded JSON</p>
+            </div>
+          )}
+
+          {/* POSTGRES INPUT */}
+          {selectedNode.data.nodeType === 'postgres-input' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Connection</label>
+                <select
+                  value={config.connectionId || ''}
+                  onChange={(e) => updateConfig({ connectionId: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="" disabled>Select a Postgres connection...</option>
+                  {connections?.filter(c => c.type === 'postgres').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {connections && connections.filter(c => c.type === 'postgres').length === 0 && (
+                  <p className="text-xs text-status-warning mt-2">No Postgres connections yet — add one on the Connections page.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">SQL Query</label>
+                <textarea
+                  value={config.query || ''}
+                  onChange={(e) => updateConfig({ query: e.target.value })}
+                  rows={4}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="SELECT * FROM users"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* S3 INPUT */}
+          {selectedNode.data.nodeType === 's3-input' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Connection</label>
+                <select
+                  value={config.connectionId || ''}
+                  onChange={(e) => updateConfig({ connectionId: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="" disabled>Select an S3 connection...</option>
+                  {connections?.filter(c => c.type === 's3').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {connections && connections.filter(c => c.type === 's3').length === 0 && (
+                  <p className="text-xs text-status-warning mt-2">No S3 connections yet — add one on the Connections page.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Object Key</label>
+                <input
+                  type="text"
+                  value={config.key || ''}
+                  onChange={(e) => updateConfig({ key: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="path/to/file.csv"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Format</label>
+                <select
+                  value={config.format || 'csv'}
+                  onChange={(e) => updateConfig({ format: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="csv">CSV</option>
+                  <option value="json">JSON</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* API INPUT */}
+          {selectedNode.data.nodeType === 'api-input' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Connection</label>
+                <select
+                  value={config.connectionId || ''}
+                  onChange={(e) => updateConfig({ connectionId: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="" disabled>Select an API connection...</option>
+                  {connections?.filter(c => c.type === 'api').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {connections && connections.filter(c => c.type === 'api').length === 0 && (
+                  <p className="text-xs text-status-warning mt-2">No API connections yet — add one on the Connections page.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Path <span className="normal-case text-text-tertiary">(appended to the connection's base URL)</span></label>
+                <input
+                  type="text"
+                  value={config.path || ''}
+                  onChange={(e) => updateConfig({ path: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="/v1/users"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Data Path <span className="normal-case text-text-tertiary">(optional; dot-path to the row array in the response)</span></label>
+                <input
+                  type="text"
+                  value={config.dataPath || ''}
+                  onChange={(e) => updateConfig({ dataPath: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="data.items"
+                />
+              </div>
             </div>
           )}
 

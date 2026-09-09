@@ -14,7 +14,7 @@ It features a React frontend with a visual node editor, a Node.js/Express API, M
 - Authentication (JWT based)
 - Project and Pipeline CRUD
 - Visual Pipeline Editor (React Flow)
-- Node types: CSV/JSON Input, Filter, Select/Rename Columns, Sort, Deduplicate, Aggregate, Join, Fill Nulls, Cast Type, CSV/JSON Output
+- Node types: CSV/JSON Input, Postgres/S3/API Connectors, Filter, Select/Rename Columns, Sort, Deduplicate, Aggregate, Join, Fill Nulls, Cast Type, CSV/JSON Output
 - Pipeline Validation (DAG constraints, configuration completeness)
 - Asynchronous Job Execution Engine (BullMQ + Redis)
 - Real-time Execution Monitoring (WebSockets)
@@ -22,10 +22,10 @@ It features a React frontend with a visual node editor, a Node.js/Express API, M
 - Execution history and result persistence
 - Pipeline versioning
 - Scheduled execution (cron)
+- Saved, encrypted third-party connections (Postgres, S3, generic API)
 
 ### Out of Scope for MVP
 - Loop/iteration nodes
-- Third-party data sources (Postgres, S3, APIs)
 - Collaboration and advanced RBAC
 - AI-assisted pipeline generation
 - OpenTelemetry and complex observability
@@ -47,13 +47,13 @@ docker build -f apps/web/Dockerfile --build-arg VITE_API_URL=https://api.example
 To run the full stack (web, api, worker, MongoDB, Redis) together:
 
 ```bash
-cp .env.example .env   # fill in real values — JWT_SECRET is required
+cp .env.example .env   # fill in real values — JWT_SECRET and CONNECTION_ENCRYPTION_KEY are required
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 `docker-compose.yml` (no `.prod`) is dev-only — it just brings up MongoDB/Redis so you can run each app locally with `npm run dev`.
 
-Required environment variables are documented in `.env.example` (API/worker) and `apps/web/.env.example` (frontend). `JWT_SECRET` has no default and the API will refuse to start without it.
+Required environment variables are documented in `.env.example` (API/worker) and `apps/web/.env.example` (frontend). `JWT_SECRET` and `CONNECTION_ENCRYPTION_KEY` have no defaults and the API will refuse to start without them.
 
 ## API Documentation
 

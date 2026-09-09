@@ -1,6 +1,6 @@
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { Database, LayoutDashboard, PlayCircle, BoxSelect, UserCircle } from 'lucide-react';
+import { Database, LayoutDashboard, PlayCircle, BoxSelect, UserCircle, Plug } from 'lucide-react';
 
 export function AppLayout() {
   const { user, logout } = useAuthStore();
@@ -8,6 +8,7 @@ export function AppLayout() {
 
   const navItems = [
     { icon: LayoutDashboard, label: 'Workspaces', path: '/' },
+    { icon: Plug, label: 'Connections', path: '/connections' },
     { icon: Database, label: 'Datasets', path: '/datasets' },
     { icon: PlayCircle, label: 'Executions', path: '/executions' },
     { icon: BoxSelect, label: 'Templates', path: '/templates' },

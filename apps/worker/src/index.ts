@@ -5,6 +5,7 @@ import path from 'path';
 import Redis from 'ioredis';
 import { PipelineEngine, PipelineValidator } from '@pipeforge/pipeline-engine';
 import { executionSchema, pipelineSchema, createLogger } from '@pipeforge/shared';
+import { resolveConnections } from './resolveConnections';
 
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
@@ -12,6 +13,13 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pipefo
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6380', 10);
 const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
+if (!process.env.CONNECTION_ENCRYPTION_KEY) {
+  throw new Error('Missing required environment variable: CONNECTION_ENCRYPTION_KEY');
+}
+// Re-bound to a plain `string` const: TS's narrowing from the guard above
+// doesn't carry into functions defined later in this file that close over
+// process.env.CONNECTION_ENCRYPTION_KEY directly.
+const CONNECTION_ENCRYPTION_KEY: string = process.env.CONNECTION_ENCRYPTION_KEY;
 
 const redisPublisher = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
 
@@ -44,7 +52,11 @@ async function startWorker() {
     publishUpdate({ type: 'STATUS', status: 'RUNNING' });
 
     try {
-      const results = await engine.execute(pipeline, {
+      // Resolve any connector node's connectionId into real credentials just
+      // before running — the pipeline object saved as the Execution's
+      // snapshot (by whichever caller created it) stays unresolved.
+      const resolvedPipeline = await resolveConnections(pipeline, CONNECTION_ENCRYPTION_KEY);
+      const results = await engine.execute(resolvedPipeline, {
         onNodeStart: (nodeId, type, label) => {
           publishUpdate({ type: 'NODE_START', nodeId, nodeType: type, label });
         },

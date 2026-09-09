@@ -17,6 +17,11 @@ function required(name: string): string {
 }
 
 export const JWT_SECRET = required('JWT_SECRET');
+// Encrypts stored connection credentials (DB passwords, S3/API keys) —
+// see packages/shared/src/crypto.ts. No insecure fallback, same reasoning
+// as JWT_SECRET: better to refuse to start than silently store secrets
+// under a well-known key.
+export const CONNECTION_ENCRYPTION_KEY = required('CONNECTION_ENCRYPTION_KEY');
 export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 export const PORT = process.env.PORT || 3000;
 export const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pipeforge';

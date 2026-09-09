@@ -71,6 +71,19 @@ components:
         completedAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    Connection:
+      type: object
+      description: >
+        A saved, reusable data-source connection. Credentials are encrypted
+        at rest and never returned by the API after creation — only
+        non-secret fields (host, bucket, baseUrl, etc.) appear in `config`.
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [postgres, s3, api] }
+        config: { type: object, description: 'Non-secret fields only, shape depends on type' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     Error:
       type: object
       properties:
@@ -502,3 +515,54 @@ paths:
                   size: { type: integer }
         '400': { description: 'No file, wrong type, or over the per-file size limit' }
         '413': { description: 'Would exceed the user''s total storage quota (MAX_USER_STORAGE_MB)' }
+
+  /connections:
+    get:
+      summary: List the current user's saved connections
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Connection' }
+    post:
+      summary: Create a saved connection (Postgres, S3, or a generic API)
+      description: >
+        `secret` holds whatever's sensitive for the type and is encrypted at
+        rest, never returned by any endpoint: `{ password }` for postgres,
+        `{ accessKeyId, secretAccessKey }` for s3, `{ token }` for api.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, config, secret]
+              properties:
+                name: { type: string }
+                type: { type: string, enum: [postgres, s3, api] }
+                config: { type: object }
+                secret: { type: object }
+      responses:
+        '201':
+          description: Created
+          content: { application/json: { schema: { $ref: '#/components/schemas/Connection' } } }
+        '400': { description: Missing required fields for the given type }
+
+  /connections/{connectionId}:
+    parameters:
+      - { name: connectionId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: Get a connection (never includes the secret)
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Connection' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Delete a connection
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }

@@ -59,6 +59,21 @@ export class PipelineValidator {
         result.errors.push(`Node '${node.data.label}' (cast-type) requires a targetType.`);
         result.isValid = false;
       }
+
+      if ((type === 'postgres-input' || type === 's3-input' || type === 'api-input') && !config.connectionId) {
+        result.errors.push(`Node '${node.data.label}' (${type}) requires a connectionId.`);
+        result.isValid = false;
+      }
+
+      if (type === 'postgres-input' && !config.query) {
+        result.errors.push(`Node '${node.data.label}' (postgres-input) requires a query.`);
+        result.isValid = false;
+      }
+
+      if (type === 's3-input' && !config.key) {
+        result.errors.push(`Node '${node.data.label}' (s3-input) requires a key (object path in the bucket).`);
+        result.isValid = false;
+      }
     });
 
     // 2. Build Adjacency List for Cycle Detection
