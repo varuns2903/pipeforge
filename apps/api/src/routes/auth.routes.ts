@@ -1,9 +1,19 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
+import rateLimit from 'express-rate-limit';
 import { authController } from '../controllers/auth.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 
 export const authRouter = Router();
+
+// Throttle login/register to blunt credential-stuffing and brute-force attempts.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts, please try again later.' }
+});
 
 const validateRegistration = [
   body('email').isEmail().withMessage('Valid email is required'),
@@ -26,6 +36,6 @@ const validate = (req: any, res: any, next: any) => {
   next();
 };
 
-authRouter.post('/register', validateRegistration, validate, authController.register);
-authRouter.post('/login', validateLogin, validate, authController.login);
+authRouter.post('/register', authLimiter, validateRegistration, validate, authController.register);
+authRouter.post('/login', authLimiter, validateLogin, validate, authController.login);
 authRouter.get('/me', requireAuth, authController.me);

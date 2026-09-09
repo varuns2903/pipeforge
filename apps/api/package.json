@@ -27,6 +27,7 @@
     "@pipeforge/pipeline-engine": "^1.0.0",
     "@pipeforge/shared": "^1.0.0",
     "bullmq": "^6.3.4",
+    "express-rate-limit": "^8.7.0",
     "ioredis": "^6.0.0",
     "multer": "^2.3.0",
     "socket.io": "^4.8.3",

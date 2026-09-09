@@ -1,12 +1,15 @@
+import './config/env'; // must load first: populates process.env before other modules read it
+
 import express from 'express';
 import cors from 'cors';
+import { WEB_URL } from './config/env';
 import { authRouter } from './routes/auth.routes';
 import { projectRouter } from './routes/project.routes';
 import { fileRouter } from './routes/file.routes';
 
 export const app = express();
 
-app.use(cors());
+app.use(cors({ origin: WEB_URL }));
 app.use(express.json());
 
 app.use('/api/auth', authRouter);

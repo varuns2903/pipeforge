@@ -38,4 +38,15 @@ describe('PipelineEngine', () => {
     const pipeline = { nodes: [], edges: [] }; // Invalid
     await expect(engine.execute(pipeline)).rejects.toThrow(/validation failed/);
   });
+
+  it('should not allow csv-input to read files outside the uploads directory', async () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: '../../../.env' } } }
+      ],
+      edges: []
+    };
+
+    await expect(engine.execute(pipeline)).rejects.toThrow(/Invalid file path/);
+  });
 });

@@ -1,23 +1,18 @@
+import './config/env'; // must load first: populates process.env before other modules read it
+
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-import path from 'path';
 import { app } from './app';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import Redis from 'ioredis';
 import jwt from 'jsonwebtoken';
-
-dotenv.config({ path: path.join(__dirname, '../../../.env') });
-
-const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pipeforge';
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+import { PORT, MONGODB_URI, JWT_SECRET, REDIS_HOST, REDIS_PORT, WEB_URL } from './config/env';
 
 const httpServer = createServer(app);
 
 // Socket.io Setup
 const io = new Server(httpServer, {
-  cors: { origin: '*' } // Match frontend origin in prod
+  cors: { origin: WEB_URL }
 });
 
 io.use((socket, next) => {
@@ -48,9 +43,7 @@ io.on('connection', (socket) => {
 });
 
 // Redis Subscriber for Worker Updates
-const redisHost = process.env.REDIS_HOST || 'localhost';
-const redisPort = parseInt(process.env.REDIS_PORT || '6380', 10);
-const redisSubscriber = new Redis({ host: redisHost, port: redisPort });
+const redisSubscriber = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
 
 redisSubscriber.subscribe('execution-updates');
 redisSubscriber.on('message', (channel, message) => {

@@ -1,4 +1,5 @@
 import { PipelineValidator } from './validator.js';
+import { compileFilterCondition } from './safeFilter.js';
 import { parse } from 'csv-parse';
 import fs from 'fs';
 import path from 'path';
@@ -112,9 +113,19 @@ export class PipelineEngine {
           // Resolve path to the monorepo root uploads folder
           const _filename = fileURLToPath(import.meta.url);
           const _dirname = path.dirname(_filename);
-          // engine is built in dist/, so root is ../../../..
-          const fullPath = path.join(_dirname, '../../../', config.filePath);
-          
+          // engine is built in dist/, so root is ../../../
+          const repoRoot = path.resolve(_dirname, '../../../');
+          const uploadsRoot = path.join(repoRoot, 'uploads');
+
+          // config.filePath is user-supplied; only allow files inside the uploads
+          // directory and reject any attempt to escape it (e.g. "../../.env").
+          const relativePath = String(config.filePath).replace(/^\/?(uploads\/)?/, '');
+          const fullPath = path.resolve(uploadsRoot, relativePath);
+
+          if (fullPath !== uploadsRoot && !fullPath.startsWith(uploadsRoot + path.sep)) {
+            return reject(new Error('Invalid file path: must be inside the uploads directory'));
+          }
+
           if (!fs.existsSync(fullPath)) {
             return reject(new Error(`File not found: ${config.filePath}`));
           }
@@ -136,15 +147,9 @@ export class PipelineEngine {
             .on('error', (err) => reject(err));
         });
 
-      case 'filter':
+      case 'filter': {
         if (!config.condition) return input;
-        // Convert simple SQL-like syntax to JS
-        let condition = config.condition
-          .replace(/\bOR\b/ig, '||')
-          .replace(/\bAND\b/ig, '&&')
-          .replace(/(?<![<>=!])=(?![=])/g, '===')
-          .replace(/\bNOT\b/ig, '!');
-        const filterFn = new Function('row', `return ${condition};`);
+        const filterFn = compileFilterCondition(config.condition);
         return input.filter((row: any) => {
           try {
             return filterFn(row);
@@ -152,6 +157,7 @@ export class PipelineEngine {
             return false;
           }
         });
+      }
 
       case 'rename-columns':
         if (!config.mapping) return input;

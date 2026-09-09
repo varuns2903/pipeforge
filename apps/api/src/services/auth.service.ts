@@ -1,9 +1,7 @@
 import { User } from '../models/User';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+import { JWT_SECRET, JWT_EXPIRES_IN } from '../config/env';
 
 export class AuthService {
   async register(email: string, password: string, name: string) {
