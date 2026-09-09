@@ -5,6 +5,32 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// The engine holds every node's full output in memory for the duration of a
+// run (context: ExecutionContext), so a dataset with unbounded rows can OOM
+// the worker process. This caps it at the source (file reads) and at the one
+// node type that can multiply row count (join), rather than attempting true
+// streaming through every stateful transform (sort/aggregate/dedupe/join all
+// need to see the whole dataset anyway).
+const MAX_ROWS = parseInt(process.env.MAX_PIPELINE_ROWS || '200000', 10);
+
+// Resolves a user-supplied config.filePath to an absolute path, rejecting
+// anything that would escape the uploads directory (e.g. "../../.env").
+function resolveUploadPath(filePath: string): string {
+  const _filename = fileURLToPath(import.meta.url);
+  const _dirname = path.dirname(_filename);
+  // engine is built in dist/, so root is ../../../
+  const repoRoot = path.resolve(_dirname, '../../../');
+  const uploadsRoot = path.join(repoRoot, 'uploads');
+
+  const relativePath = String(filePath).replace(/^\/?(uploads\/)?/, '');
+  const fullPath = path.resolve(uploadsRoot, relativePath);
+
+  if (fullPath !== uploadsRoot && !fullPath.startsWith(uploadsRoot + path.sep)) {
+    throw new Error('Invalid file path: must be inside the uploads directory');
+  }
+  return fullPath;
+}
+
 export interface ExecutionContext {
   [nodeId: string]: any[]; // the output data of each node (array of objects)
 }
@@ -112,20 +138,11 @@ export class PipelineEngine {
         
         // Handle real file reading
         return new Promise((resolve, reject) => {
-          // Resolve path to the monorepo root uploads folder
-          const _filename = fileURLToPath(import.meta.url);
-          const _dirname = path.dirname(_filename);
-          // engine is built in dist/, so root is ../../../
-          const repoRoot = path.resolve(_dirname, '../../../');
-          const uploadsRoot = path.join(repoRoot, 'uploads');
-
-          // config.filePath is user-supplied; only allow files inside the uploads
-          // directory and reject any attempt to escape it (e.g. "../../.env").
-          const relativePath = String(config.filePath).replace(/^\/?(uploads\/)?/, '');
-          const fullPath = path.resolve(uploadsRoot, relativePath);
-
-          if (fullPath !== uploadsRoot && !fullPath.startsWith(uploadsRoot + path.sep)) {
-            return reject(new Error('Invalid file path: must be inside the uploads directory'));
+          let fullPath: string;
+          try {
+            fullPath = resolveUploadPath(config.filePath);
+          } catch (err: any) {
+            return reject(err);
           }
 
           if (!fs.existsSync(fullPath)) {
@@ -133,21 +150,45 @@ export class PipelineEngine {
           }
 
           const results: any[] = [];
-          fs.createReadStream(fullPath)
-            .pipe(parse({ 
-              columns: true, 
-              skip_empty_lines: true, 
-              cast: (value) => {
-                if (value === 'true') return true;
-                if (value === 'false') return false;
-                if (value.trim() !== '' && !isNaN(Number(value))) return Number(value);
-                return value;
+          const stream = fs.createReadStream(fullPath).pipe(parse({
+            columns: true,
+            skip_empty_lines: true,
+            cast: (value) => {
+              if (value === 'true') return true;
+              if (value === 'false') return false;
+              if (value.trim() !== '' && !isNaN(Number(value))) return Number(value);
+              return value;
+            }
+          }));
+          stream
+            .on('data', (data) => {
+              results.push(data);
+              if (results.length > MAX_ROWS) {
+                stream.destroy();
+                reject(new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`));
               }
-            }))
-            .on('data', (data) => results.push(data))
-            .on('end', () => resolve(results))
+            })
+            .on('close', () => {
+              if (results.length <= MAX_ROWS) resolve(results);
+            })
             .on('error', (err) => reject(err));
         });
+
+      case 'json-input': {
+        if (!config.filePath) {
+          throw new Error('json-input requires a filePath');
+        }
+        const fullPath = resolveUploadPath(config.filePath);
+        if (!fs.existsSync(fullPath)) {
+          throw new Error(`File not found: ${config.filePath}`);
+        }
+        const parsed = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+        const rows = Array.isArray(parsed) ? parsed : [parsed];
+        if (rows.length > MAX_ROWS) {
+          throw new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`);
+        }
+        return rows;
+      }
 
       case 'filter': {
         if (!config.condition) return input;
@@ -294,6 +335,11 @@ export class PipelineEngine {
           }
           for (const rightRow of matches) {
             joined.push({ ...leftRow, ...rightRow });
+            // Duplicate keys on both sides can multiply row count well past
+            // either input's size — cap it the same as a source read.
+            if (joined.length > MAX_ROWS) {
+              throw new Error(`Join output exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`);
+            }
           }
         }
         return joined;
