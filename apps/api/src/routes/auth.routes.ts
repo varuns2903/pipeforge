@@ -38,4 +38,5 @@ const validate = (req: any, res: any, next: any) => {
 
 authRouter.post('/register', authLimiter, validateRegistration, validate, authController.register);
 authRouter.post('/login', authLimiter, validateLogin, validate, authController.login);
+authRouter.post('/logout', authController.logout);
 authRouter.get('/me', requireAuth, authController.me);

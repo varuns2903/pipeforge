@@ -23,3 +23,9 @@ export const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017
 export const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 export const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6380', 10);
 export const WEB_URL = process.env.WEB_URL || 'http://localhost:5173';
+export const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+// Kept independent of JWT_EXPIRES_IN (a jsonwebtoken-format string like '7d')
+// to avoid pulling in a date-math dependency just for this; if you change
+// JWT_EXPIRES_IN, update this too so the cookie doesn't outlive the token
+// (harmless if it does — the token itself will just fail verification).
+export const AUTH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;

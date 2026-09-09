@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useAuthStore } from '../../store/authStore';
 import { Terminal, X, CheckCircle, Loader, AlertTriangle } from 'lucide-react';
 
 interface LogEntry {
@@ -10,7 +9,6 @@ interface LogEntry {
 }
 
 export function ExecutionDrawer({ pipelineId, onClose }: { pipelineId: string, onClose: () => void }) {
-  const { token } = useAuthStore();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [status, setStatus] = useState<'IDLE' | 'RUNNING' | 'COMPLETED' | 'FAILED'>('IDLE');
 
@@ -18,9 +16,11 @@ export function ExecutionDrawer({ pipelineId, onClose }: { pipelineId: string, o
     // Determine API URL for Socket.io
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     const url = apiUrl.replace('/api', ''); // Get base domain
-    
+
+    // The auth token is an httpOnly cookie now — withCredentials sends it
+    // automatically on the handshake instead of passing it explicitly.
     const socket: Socket = io(url, {
-      auth: { token }
+      withCredentials: true
     });
 
     socket.on('connect', () => {
@@ -54,7 +54,7 @@ export function ExecutionDrawer({ pipelineId, onClose }: { pipelineId: string, o
     return () => {
       socket.disconnect();
     };
-  }, [pipelineId, token]);
+  }, [pipelineId]);
 
   return (
     <div className="absolute bottom-0 left-0 right-0 h-64 bg-surface-1 border-t border-border-strong flex flex-col shadow-2xl z-40 transform transition-transform">

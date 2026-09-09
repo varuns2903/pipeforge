@@ -9,13 +9,16 @@ export interface AuthRequest extends Request {
 
 export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    // Browser clients authenticate via the httpOnly cookie set on login;
+    // non-browser API clients (scripts, other services) may instead send
+    // an Authorization: Bearer header.
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const token = (req as any).cookies?.token || (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
+    if (!token) {
       res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
       return;
     }
 
-    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
 
     const user = await User.findById(decoded.id).select('-password');

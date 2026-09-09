@@ -92,7 +92,39 @@ describe('Auth Endpoints', () => {
     const res = await request(app)
       .get('/api/auth/me')
       .set('Authorization', 'Bearer invalid.token.here');
-    
+
     expect(res.status).toBe(401);
     expect(res.body.error).toBe('Unauthorized: Invalid token');
   });
+
+describe('Cookie-based auth', () => {
+  it('sets an httpOnly cookie on login and uses it to authenticate', async () => {
+    const agent = request.agent(app); // persists cookies across requests, like a browser
+
+    const loginRes = await agent
+      .post('/api/auth/login')
+      .send({ email: 'test@example.com', password: 'password123' });
+
+    expect(loginRes.status).toBe(200);
+    const setCookie = loginRes.headers['set-cookie'];
+    expect(setCookie).toBeDefined();
+    expect(setCookie[0]).toMatch(/token=/);
+    expect(setCookie[0]).toMatch(/HttpOnly/);
+
+    // No Authorization header — the agent's cookie jar carries the session.
+    const meRes = await agent.get('/api/auth/me');
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.user.email).toBe('test@example.com');
+  });
+
+  it('clears the cookie on logout, ending the session', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/login').send({ email: 'test@example.com', password: 'password123' });
+
+    const logoutRes = await agent.post('/api/auth/logout');
+    expect(logoutRes.status).toBe(204);
+
+    const meRes = await agent.get('/api/auth/me');
+    expect(meRes.status).toBe(401);
+  });
+});

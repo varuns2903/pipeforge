@@ -1,31 +1,26 @@
 import { create } from 'zustand';
 import type { User } from '@pipeforge/shared';
+import { api } from '../lib/api';
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: User, token: string) => void;
+  setAuth: (user: User) => void;
   logout: () => void;
-  restoreAuth: (user: User, token: string) => void;
 }
 
+// The token itself lives in an httpOnly cookie the browser manages — this
+// store only tracks who's currently signed in, not the credential itself.
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
-  
-  setAuth: (user, token) => {
-    localStorage.setItem('token', token);
-    set({ user, token, isAuthenticated: true });
-  },
-  
-  logout: () => {
-    localStorage.removeItem('token');
-    set({ user: null, token: null, isAuthenticated: false });
+  isAuthenticated: false,
+
+  setAuth: (user) => {
+    set({ user, isAuthenticated: true });
   },
 
-  restoreAuth: (user, token) => {
-    set({ user, token, isAuthenticated: true });
-  }
+  logout: () => {
+    api.post('/auth/logout').catch(() => {});
+    set({ user: null, isAuthenticated: false });
+  },
 }));

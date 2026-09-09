@@ -17,7 +17,7 @@ export function Login() {
     setIsLoading(true);
     try {
       const res = await api.post('/auth/login', { email, password });
-      setAuth(res.data.user, res.data.token);
+      setAuth(res.data.user);
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to login');

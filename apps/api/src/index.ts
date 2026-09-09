@@ -6,17 +6,25 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import Redis from 'ioredis';
 import jwt from 'jsonwebtoken';
+import cookie from 'cookie';
 import { PORT, MONGODB_URI, JWT_SECRET, REDIS_HOST, REDIS_PORT, WEB_URL } from './config/env';
 
 const httpServer = createServer(app);
 
 // Socket.io Setup
 const io = new Server(httpServer, {
-  cors: { origin: WEB_URL }
+  cors: { origin: WEB_URL, credentials: true }
 });
 
+// Browser clients authenticate via the httpOnly cookie sent automatically on
+// the handshake request (socket.io-client must set withCredentials: true);
+// non-browser clients may instead pass the token explicitly.
 io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
+  const explicitToken = socket.handshake.auth.token;
+  const cookieHeader = socket.handshake.headers.cookie;
+  const cookieToken = cookieHeader ? cookie.parse(cookieHeader).token : undefined;
+  const token = explicitToken || cookieToken;
+
   if (!token) {
     return next(new Error('Authentication error'));
   }
