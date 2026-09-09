@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import { User } from '../src/models/User';
 
 // Use a separate database for tests
@@ -163,5 +164,78 @@ describe('Account lockout', () => {
     // 6th attempt — even with the CORRECT password — should now be locked out.
     const lockedRes = await request(app).post('/api/auth/login').send({ email, password: 'password123' });
     expect(lockedRes.status).toBe(423);
+  });
+});
+
+describe('Email verification', () => {
+  it('registers with emailVerified: false', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ email: 'verify@example.com', password: 'password123', name: 'Verify Me' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.user.emailVerified).toBe(false);
+  });
+
+  it('verifies the email with a valid token', async () => {
+    // The raw token is only ever sent via email (never returned by the API),
+    // so simulate "the user clicked the emailed link" by hashing a known raw
+    // token the same way the service does and writing it directly to the DB.
+    const rawToken = 'known-raw-verification-token';
+    const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    await User.findOneAndUpdate(
+      { email: 'verify@example.com' },
+      { emailVerificationTokenHash: hash, emailVerificationExpires: new Date(Date.now() + 60_000) }
+    );
+
+    const res = await request(app).post('/api/auth/verify-email').send({ token: rawToken });
+    expect(res.status).toBe(204);
+
+    const user = await User.findOne({ email: 'verify@example.com' });
+    expect(user?.emailVerified).toBe(true);
+  });
+
+  it('rejects an invalid or expired verification token', async () => {
+    const res = await request(app).post('/api/auth/verify-email').send({ token: 'not-a-real-token' });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('Password reset', () => {
+  beforeAll(async () => {
+    await request(app).post('/api/auth/register').send({ email: 'resetme@example.com', password: 'password123', name: 'Reset Me' });
+  });
+
+  it('always returns 204 from forgot-password, whether or not the email exists', async () => {
+    const known = await request(app).post('/api/auth/forgot-password').send({ email: 'resetme@example.com' });
+    expect(known.status).toBe(204);
+
+    const unknown = await request(app).post('/api/auth/forgot-password').send({ email: 'nobody@example.com' });
+    expect(unknown.status).toBe(204);
+  });
+
+  it('resets the password with a valid token and the old password stops working', async () => {
+    const rawToken = 'known-raw-reset-token';
+    const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    await User.findOneAndUpdate(
+      { email: 'resetme@example.com' },
+      { passwordResetTokenHash: hash, passwordResetExpires: new Date(Date.now() + 60_000) }
+    );
+
+    const resetRes = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: rawToken, password: 'newpassword123' });
+    expect(resetRes.status).toBe(204);
+
+    const oldLogin = await request(app).post('/api/auth/login').send({ email: 'resetme@example.com', password: 'password123' });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await request(app).post('/api/auth/login').send({ email: 'resetme@example.com', password: 'newpassword123' });
+    expect(newLogin.status).toBe(200);
+  });
+
+  it('rejects an invalid or expired reset token', async () => {
+    const res = await request(app).post('/api/auth/reset-password').send({ token: 'not-a-real-token', password: 'newpassword123' });
+    expect(res.status).toBe(400);
   });
 });

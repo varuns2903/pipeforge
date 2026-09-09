@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { IS_PRODUCTION, AUTH_COOKIE_MAX_AGE_MS } from '../config/env';
 
 // httpOnly so client-side JS (and therefore an XSS payload) can't read the
@@ -57,6 +58,59 @@ export class AuthController {
   async me(req: Request, res: Response) {
     // Requires auth middleware to populate req.user
     res.json({ user: (req as any).user });
+  }
+
+  async verifyEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token } = req.body;
+      await authService.verifyEmail(token);
+      res.status(204).send();
+    } catch (error: any) {
+      if (error.message.includes('invalid or has expired')) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+      next(error);
+    }
+  }
+
+  async resendVerification(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      await authService.resendVerificationEmail(req.user.id);
+      res.status(204).send();
+    } catch (error: any) {
+      if (error.message === 'Email already verified') {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+      next(error);
+    }
+  }
+
+  async forgotPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+      await authService.requestPasswordReset(email);
+      // Same response whether or not the email exists — avoids leaking
+      // which addresses are registered.
+      res.status(204).send();
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token, password } = req.body;
+      await authService.resetPassword(token, password);
+      res.status(204).send();
+    } catch (error: any) {
+      if (error.message.includes('invalid or has expired')) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+      next(error);
+    }
   }
 }
 

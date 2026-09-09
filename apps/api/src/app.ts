@@ -4,13 +4,13 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
-import { createLogger } from '@pipeforge/shared';
 import { WEB_URL } from './config/env';
+import { logger } from './logger';
 import { authRouter } from './routes/auth.routes';
 import { projectRouter } from './routes/project.routes';
 import { fileRouter } from './routes/file.routes';
 
-export const logger = createLogger('api');
+export { logger };
 
 export const app = express();
 

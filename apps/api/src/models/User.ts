@@ -18,7 +18,12 @@ const userSchema = new mongoose.Schema({
     trim: true
   },
   failedLoginAttempts: { type: Number, default: 0 },
-  lockedUntil: { type: Date }
+  lockedUntil: { type: Date },
+  emailVerified: { type: Boolean, default: false },
+  emailVerificationTokenHash: { type: String },
+  emailVerificationExpires: { type: Date },
+  passwordResetTokenHash: { type: String },
+  passwordResetExpires: { type: Date }
 }, {
   timestamps: true
 });

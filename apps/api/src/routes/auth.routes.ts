@@ -12,6 +12,7 @@ const authLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
   message: { error: 'Too many attempts, please try again later.' }
 });
 
@@ -29,6 +30,18 @@ const validateLogin = [
   body('password').notEmpty().withMessage('Password is required')
 ];
 
+const validateNewPassword = [
+  body('token').notEmpty().withMessage('Token is required'),
+  body('password')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/[a-zA-Z]/).withMessage('Password must contain at least one letter')
+    .matches(/[0-9]/).withMessage('Password must contain at least one number'),
+];
+
+const validateEmail = [
+  body('email').isEmail().withMessage('Valid email is required')
+];
+
 // Helper to check validation results
 import { validationResult } from 'express-validator';
 const validate = (req: any, res: any, next: any) => {
@@ -43,3 +56,8 @@ authRouter.post('/register', authLimiter, validateRegistration, validate, authCo
 authRouter.post('/login', authLimiter, validateLogin, validate, authController.login);
 authRouter.post('/logout', authController.logout);
 authRouter.get('/me', requireAuth, authController.me);
+
+authRouter.post('/verify-email', authLimiter, authController.verifyEmail);
+authRouter.post('/resend-verification', authLimiter, requireAuth, authController.resendVerification);
+authRouter.post('/forgot-password', authLimiter, validateEmail, validate, authController.forgotPassword);
+authRouter.post('/reset-password', authLimiter, validateNewPassword, validate, authController.resetPassword);

@@ -29,3 +29,12 @@ export const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 // JWT_EXPIRES_IN, update this too so the cookie doesn't outlive the token
 // (harmless if it does — the token itself will just fail verification).
 export const AUTH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+// SMTP is optional: when unset, the mailer logs emails instead of sending
+// them (see services/mailer.service.ts) so verification/reset flows still
+// work end-to-end in dev/test without real credentials.
+export const SMTP_HOST = process.env.SMTP_HOST;
+export const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
+export const SMTP_USER = process.env.SMTP_USER;
+export const SMTP_PASS = process.env.SMTP_PASS;
+export const MAIL_FROM = process.env.MAIL_FROM || 'PipeForge <no-reply@pipeforge.local>';
