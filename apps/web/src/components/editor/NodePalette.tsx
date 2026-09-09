@@ -1,4 +1,4 @@
-import { Database, Filter, Settings, FileOutput, Calculator, Type, ArrowDownAZ, CopyMinus } from 'lucide-react';
+import { Database, Filter, Settings, FileOutput, Calculator, Type, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle } from 'lucide-react';
 
 const NODE_TYPES = [
   { category: 'Input', items: [
@@ -11,6 +11,9 @@ const NODE_TYPES = [
     { type: 'rename-columns', label: 'Rename Columns', icon: Type },
     { type: 'sort', label: 'Sort Data', icon: ArrowDownAZ },
     { type: 'deduplicate', label: 'Remove Duplicates', icon: CopyMinus },
+    { type: 'fill-nulls', label: 'Fill Nulls', icon: Eraser },
+    { type: 'cast-type', label: 'Cast Column Type', icon: Shuffle },
+    { type: 'join', label: 'Join Datasets', icon: GitMerge },
   ]},
   { category: 'Aggregate', items: [
     { type: 'aggregate', label: 'Group & Aggregate', icon: Calculator },

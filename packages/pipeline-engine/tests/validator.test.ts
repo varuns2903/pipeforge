@@ -67,4 +67,50 @@ describe('PipelineValidator', () => {
     const result = validator.validate(pipeline);
     expect(result.warnings.some((w: string) => w.includes('T') && w.includes('incoming connections'))).toBe(true);
   });
+
+  it('should require a join node to have a leftKey configured', () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'A', config: { filePath: 'a.csv' } } },
+        { id: '2', data: { nodeType: 'csv-input', label: 'B', config: { filePath: 'b.csv' } } },
+        { id: '3', data: { nodeType: 'join', label: 'Join', config: {} } }
+      ],
+      edges: [
+        { source: '1', target: '3' },
+        { source: '2', target: '3' }
+      ]
+    };
+    const result = validator.validate(pipeline);
+    expect(result.isValid).toBe(false);
+    expect(result.errors.some((e: string) => e.includes('requires a leftKey'))).toBe(true);
+  });
+
+  it('should require a join node to have exactly 2 incoming connections', () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'A', config: { filePath: 'a.csv' } } },
+        { id: '3', data: { nodeType: 'join', label: 'Join', config: { leftKey: 'id' } } }
+      ],
+      edges: [
+        { source: '1', target: '3' }
+      ]
+    };
+    const result = validator.validate(pipeline);
+    expect(result.isValid).toBe(false);
+    expect(result.errors.some((e: string) => e.includes('exactly 2 incoming connections'))).toBe(true);
+  });
+
+  it('should require cast-type to have a column and targetType', () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'A', config: { filePath: 'a.csv' } } },
+        { id: '2', data: { nodeType: 'cast-type', label: 'Cast', config: {} } }
+      ],
+      edges: [{ source: '1', target: '2' }]
+    };
+    const result = validator.validate(pipeline);
+    expect(result.isValid).toBe(false);
+    expect(result.errors.some((e: string) => e.includes('requires a column'))).toBe(true);
+    expect(result.errors.some((e: string) => e.includes('requires a targetType'))).toBe(true);
+  });
 });

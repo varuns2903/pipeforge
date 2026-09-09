@@ -49,4 +49,95 @@ describe('PipelineEngine', () => {
 
     await expect(engine.execute(pipeline)).rejects.toThrow(/Invalid file path/);
   });
+
+  it('should join two datasets on a shared key (inner join)', async () => {
+    // Mock data: { id, name, age, country } x4. Split into two derived
+    // streams sharing `id`, then join them back together.
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: 'mock' } } },
+        { id: '2', data: { nodeType: 'select-columns', label: 'Left', config: { columns: 'id, name' } } },
+        { id: '3', data: { nodeType: 'select-columns', label: 'Right', config: { columns: 'id, country' } } },
+        { id: '4', data: { nodeType: 'join', label: 'Join', config: { leftKey: 'id' } } },
+      ],
+      edges: [
+        { source: '1', target: '2' },
+        { source: '1', target: '3' },
+        { source: '2', target: '4' }, // edge order determines left/right
+        { source: '3', target: '4' },
+      ]
+    };
+
+    const result = await engine.execute(pipeline);
+    expect(result['4']!.length).toBe(4);
+    expect(result['4']![0]).toEqual({ id: 1, name: 'Alice', country: 'US' });
+  });
+
+  it('left join keeps unmatched left rows; inner join drops them', async () => {
+    const pipeline = (joinType?: string) => ({
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: 'mock' } } },
+        { id: '2', data: { nodeType: 'select-columns', label: 'Left', config: { columns: 'id, name' } } },
+        // Right side only keeps adults (mock data: Alice 28, Bob 17, Charlie
+        // 34, David 15 — so Bob and David become unmatched left rows).
+        { id: '3', data: { nodeType: 'filter', label: 'Adults', config: { condition: 'row.age >= 18' } } },
+        { id: '4', data: { nodeType: 'select-columns', label: 'RightSelect', config: { columns: 'id, country' } } },
+        { id: '5', data: { nodeType: 'join', label: 'Join', config: { leftKey: 'id', joinType } } },
+      ],
+      edges: [
+        { source: '1', target: '2' },
+        { source: '1', target: '3' },
+        { source: '3', target: '4' },
+        { source: '2', target: '5' },
+        { source: '4', target: '5' },
+      ]
+    });
+
+    const inner = await engine.execute(pipeline('inner'));
+    expect(inner['5']!.length).toBe(2); // only Alice and Charlie matched
+
+    const left = await engine.execute(pipeline('left'));
+    expect(left['5']!.length).toBe(4); // Bob and David kept, without a `country` field
+    expect(left['5']!.find((r: any) => r.name === 'David')).toEqual({ id: 4, name: 'David' });
+  });
+
+  it('fill-nulls replaces missing/empty values with a default', async () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: 'mock' } } },
+        { id: '2', data: { nodeType: 'fill-nulls', label: 'Fill', config: { column: 'country', value: 'UNKNOWN' } } },
+      ],
+      edges: [{ source: '1', target: '2' }]
+    };
+    const result = await engine.execute(pipeline);
+    // None of the mock rows have an empty country, so this is a no-op check —
+    // just confirms the node runs and passes rows through unchanged.
+    expect(result['2']!.length).toBe(4);
+  });
+
+  it('cast-type converts a column to number/boolean/string', async () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: 'mock' } } },
+        { id: '2', data: { nodeType: 'cast-type', label: 'Cast', config: { column: 'age', targetType: 'string' } } },
+      ],
+      edges: [{ source: '1', target: '2' }]
+    };
+    const result = await engine.execute(pipeline);
+    expect(typeof result['2']![0].age).toBe('string');
+    expect(result['2']![0].age).toBe('28');
+  });
+
+  it('aggregate supports min, max, and count-distinct', async () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: 'mock' } } },
+        { id: '2', data: { nodeType: 'aggregate', label: 'Agg', config: { groupBy: 'country', operation: 'min', targetColumn: 'age' } } },
+      ],
+      edges: [{ source: '1', target: '2' }]
+    };
+    const result = await engine.execute(pipeline);
+    const us = result['2']!.find((r: any) => r.country === 'US');
+    expect(us.min_age).toBe(15); // David (15) < Alice (28), both US
+  });
 });

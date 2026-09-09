@@ -241,10 +241,13 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges }: { selectedNode
                   <option value="count">Count (rows)</option>
                   <option value="sum">Sum</option>
                   <option value="avg">Average</option>
+                  <option value="min">Min</option>
+                  <option value="max">Max</option>
+                  <option value="count-distinct">Count Distinct</option>
                 </select>
               </div>
 
-              {(config.operation === 'sum' || config.operation === 'avg') && (
+              {config.operation !== 'count' && (
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Target Column</label>
                   <input
@@ -266,13 +269,108 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges }: { selectedNode
                   <span className="px-2 py-0.5 bg-surface-3 rounded text-xs font-mono text-text-primary">count</span>
                   {config.operation && config.operation !== 'count' && (
                     <span className="px-2 py-0.5 bg-surface-3 rounded text-xs font-mono text-text-primary">
-                      {config.operation}_{config.targetColumn || 'target'}
+                      {config.operation.replace('-', '_')}_{config.targetColumn || 'target'}
                     </span>
                   )}
                 </div>
                 <p className="text-[10px] text-text-tertiary mt-2">
                   * A <code className="text-[10px] bg-surface-3 px-1 rounded">count</code> column is always generated automatically so you can use it in downstream filters (like SQL HAVING).
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* FILL NULLS */}
+          {selectedNode.data.nodeType === 'fill-nulls' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Column</label>
+                <input
+                  type="text"
+                  value={config.column || ''}
+                  onChange={(e) => updateConfig({ column: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                  placeholder="e.g. country"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Fill Value</label>
+                <input
+                  type="text"
+                  value={config.value || ''}
+                  onChange={(e) => updateConfig({ value: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                  placeholder="e.g. UNKNOWN"
+                />
+                <p className="text-xs text-text-tertiary mt-2">Rows where this column is missing/empty get this value instead.</p>
+              </div>
+            </div>
+          )}
+
+          {/* CAST TYPE */}
+          {selectedNode.data.nodeType === 'cast-type' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Column</label>
+                <input
+                  type="text"
+                  value={config.column || ''}
+                  onChange={(e) => updateConfig({ column: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                  placeholder="e.g. age"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Target Type</label>
+                <select
+                  value={config.targetType || 'string'}
+                  onChange={(e) => updateConfig({ targetType: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="string">String</option>
+                  <option value="number">Number</option>
+                  <option value="boolean">Boolean</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* JOIN */}
+          {selectedNode.data.nodeType === 'join' && (
+            <div className="space-y-4">
+              <div className="p-3 bg-accent-500/10 border border-accent-500/20 rounded-lg text-xs text-text-secondary">
+                Connect exactly two inputs to this node — the first edge you draw is the <strong>left</strong> dataset, the second is the <strong>right</strong> dataset.
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Left Key</label>
+                <input
+                  type="text"
+                  value={config.leftKey || ''}
+                  onChange={(e) => updateConfig({ leftKey: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="e.g. id"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Right Key <span className="normal-case text-text-tertiary">(optional, defaults to Left Key)</span></label>
+                <input
+                  type="text"
+                  value={config.rightKey || ''}
+                  onChange={(e) => updateConfig({ rightKey: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="e.g. user_id"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Join Type</label>
+                <select
+                  value={config.joinType || 'inner'}
+                  onChange={(e) => updateConfig({ joinType: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="inner">Inner (only matching rows)</option>
+                  <option value="left">Left (keep all left rows)</option>
+                </select>
               </div>
             </div>
           )}

@@ -63,13 +63,11 @@ export class PipelineEngine {
       const node = nodeMap[nodeId];
       const config = node.data.config || {};
       
+      // One array per incoming edge (in edge order) rather than pre-flattened —
+      // most node types just flatten these themselves, but `join` needs its
+      // two input datasets kept separate.
       const incomingEdges = edges.filter((e: any) => e.target === nodeId);
-      let inputData: any[] = [];
-      for (const edge of incomingEdges) {
-        if (context[edge.source]) {
-          inputData = inputData.concat(context[edge.source]);
-        }
-      }
+      const inputs: any[][] = incomingEdges.map((edge: any) => context[edge.source] || []);
 
       try {
         const startTime = Date.now();
@@ -77,7 +75,7 @@ export class PipelineEngine {
           callbacks.onNodeStart(nodeId, node.data.nodeType, node.data.label || nodeId);
         }
 
-        const outputData = await this.executeNode(node.data.nodeType, config, inputData);
+        const outputData = await this.executeNode(node.data.nodeType, config, inputs);
         context[nodeId] = outputData;
 
         const duration = Date.now() - startTime;
@@ -96,7 +94,11 @@ export class PipelineEngine {
     return context;
   }
 
-  private async executeNode(type: string, config: any, input: any[]): Promise<any[]> {
+  private async executeNode(type: string, config: any, inputs: any[][]): Promise<any[]> {
+    // Every node type except `join` treats all its incoming edges as one
+    // combined dataset (matches the pre-existing single-input behavior).
+    const input = inputs.flat();
+
     switch (type) {
       case 'csv-input':
         if (config.filePath === 'mock' || !config.filePath) {
@@ -249,10 +251,86 @@ export class PipelineEngine {
           } else if (config.operation === 'avg' && config.targetColumn) {
             const sum = rows.reduce((acc, r) => acc + (Number(r[config.targetColumn]) || 0), 0);
             outRow[`avg_${config.targetColumn}`] = rows.length ? sum / rows.length : 0;
+          } else if (config.operation === 'min' && config.targetColumn) {
+            outRow[`min_${config.targetColumn}`] = rows.reduce((acc, r) => {
+              const v = Number(r[config.targetColumn]);
+              return acc === null || (!isNaN(v) && v < acc) ? v : acc;
+            }, null as number | null);
+          } else if (config.operation === 'max' && config.targetColumn) {
+            outRow[`max_${config.targetColumn}`] = rows.reduce((acc, r) => {
+              const v = Number(r[config.targetColumn]);
+              return acc === null || (!isNaN(v) && v > acc) ? v : acc;
+            }, null as number | null);
+          } else if (config.operation === 'count-distinct' && config.targetColumn) {
+            outRow[`count_distinct_${config.targetColumn}`] = new Set(rows.map(r => r[config.targetColumn])).size;
           }
           result.push(outRow);
         }
         return result;
+
+      case 'join': {
+        // Requires exactly two incoming edges: [left, right] in the order
+        // they're connected. Unlike every other node type, join can't just
+        // flatten its inputs — the two datasets are joined, not concatenated.
+        const [left = [], right = []] = inputs;
+        const leftKey = config.leftKey;
+        const rightKey = config.rightKey || config.leftKey;
+        if (!leftKey || !rightKey) return left;
+
+        const isLeftJoin = config.joinType === 'left';
+        const rightIndex = new Map<string, any[]>();
+        right.forEach((row: any) => {
+          const key = String(row[rightKey]);
+          if (!rightIndex.has(key)) rightIndex.set(key, []);
+          rightIndex.get(key)!.push(row);
+        });
+
+        const joined: any[] = [];
+        for (const leftRow of left) {
+          const matches = rightIndex.get(String(leftRow[leftKey])) || [];
+          if (matches.length === 0) {
+            if (isLeftJoin) joined.push({ ...leftRow });
+            continue;
+          }
+          for (const rightRow of matches) {
+            joined.push({ ...leftRow, ...rightRow });
+          }
+        }
+        return joined;
+      }
+
+      case 'fill-nulls': {
+        if (!config.column) return input;
+        const fillValue = config.value ?? '';
+        return input.map(row => {
+          const value = row[config.column];
+          if (value === null || value === undefined || value === '') {
+            return { ...row, [config.column]: fillValue };
+          }
+          return row;
+        });
+      }
+
+      case 'cast-type': {
+        if (!config.column || !config.targetType) return input;
+        const cast = (value: any): any => {
+          if (value === null || value === undefined) return value;
+          switch (config.targetType) {
+            case 'number': {
+              const n = Number(value);
+              return isNaN(n) ? null : n;
+            }
+            case 'boolean':
+              if (typeof value === 'boolean') return value;
+              return ['true', '1', 'yes'].includes(String(value).toLowerCase());
+            case 'string':
+              return String(value);
+            default:
+              return value;
+          }
+        };
+        return input.map(row => ({ ...row, [config.column]: cast(row[config.column]) }));
+      }
 
       case 'csv-output':
         return input;

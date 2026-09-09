@@ -1,6 +1,6 @@
 import { Handle, Position } from '@xyflow/react';
 import { useDirection } from './DirectionContext';
-import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus } from 'lucide-react';
+import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle } from 'lucide-react';
 
 const icons: Record<string, any> = {
   'csv-input': Database,
@@ -11,7 +11,10 @@ const icons: Record<string, any> = {
   'sort': ArrowDownAZ,
   'deduplicate': CopyMinus,
   'csv-output': FileOutput,
-  'aggregate': Calculator
+  'aggregate': Calculator,
+  'join': GitMerge,
+  'fill-nulls': Eraser,
+  'cast-type': Shuffle
 };
 
 const getCategoryColor = (type: string) => {
