@@ -1,0 +1,74 @@
+# Production-shaped compose file: builds and runs the full stack (web, api,
+# worker, mongo, redis). Dev-only workflow still uses docker-compose.yml
+# (just the databases) alongside `npm run dev` in each app.
+#
+# Usage:
+#   cp .env.example .env   # then fill in real values, especially JWT_SECRET
+#   docker compose -f docker-compose.prod.yml up -d --build
+services:
+  mongodb:
+    image: mongo:6
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      - mongodb
+      - redis
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGODB_URI: mongodb://mongodb:27017/pipeforge
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      WEB_URL: ${WEB_URL:-http://localhost:5173}
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
+    volumes:
+      - uploads_data:/repo/uploads
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    depends_on:
+      - mongodb
+      - redis
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/pipeforge
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - uploads_data:/repo/uploads
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    depends_on:
+      - api
+    ports:
+      - '5173:80'
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+  redis_data:
+  uploads_data:

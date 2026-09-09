@@ -12,6 +12,10 @@ export const app = express();
 app.use(cors({ origin: WEB_URL }));
 app.use(express.json());
 
+app.get('/healthz', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 app.use('/api/auth', authRouter);
 app.use('/api/projects', projectRouter);
 app.use('/api/files', fileRouter);
