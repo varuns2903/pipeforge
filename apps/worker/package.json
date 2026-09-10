@@ -6,14 +6,16 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "tsx": "^4.23.13",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
   },
   "dependencies": {
     "@pipeforge/pipeline-engine": "^1.0.0",

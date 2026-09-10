@@ -5,6 +5,15 @@ const CONNECTOR_NODE_TYPES = new Set(['postgres-input', 's3-input', 'api-input']
 
 const Connection = mongoose.model('Connection', connectionSchema);
 
+export interface ConnectionRecord {
+  config: any;
+  encryptedSecret: string;
+}
+
+async function defaultFetchConnection(connectionId: string): Promise<ConnectionRecord | null> {
+  return Connection.findById(connectionId);
+}
+
 /**
  * Returns a copy of the pipeline where any connector node's `connectionId`
  * has been resolved into real, plaintext credentials merged into that
@@ -15,8 +24,15 @@ const Connection = mongoose.model('Connection', connectionSchema);
  * *unresolved* pipeline (with connectionId, not credentials) as the
  * Execution's pipelineSnapshot, so decrypted secrets never land in the
  * database or get sent back to a browser.
+ *
+ * `fetchConnection` is injectable (defaults to a real Mongo lookup) so this
+ * function's merging/error logic can be unit tested without a database.
  */
-export async function resolveConnections(pipeline: any, encryptionKey: string): Promise<any> {
+export async function resolveConnections(
+  pipeline: any,
+  encryptionKey: string,
+  fetchConnection: (connectionId: string) => Promise<ConnectionRecord | null> = defaultFetchConnection
+): Promise<any> {
   const nodes = await Promise.all(
     (pipeline.nodes || []).map(async (node: any) => {
       const nodeType = node.data?.nodeType;
@@ -25,7 +41,7 @@ export async function resolveConnections(pipeline: any, encryptionKey: string): 
         return node;
       }
 
-      const connection = await Connection.findById(connectionId);
+      const connection = await fetchConnection(connectionId);
       if (!connection) {
         throw new Error(`Connection ${connectionId} referenced by node '${node.data?.label || node.id}' was not found`);
       }

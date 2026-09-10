@@ -6,6 +6,8 @@ import Redis from 'ioredis';
 import { PipelineEngine, PipelineValidator } from '@pipeforge/pipeline-engine';
 import { executionSchema, pipelineSchema, createLogger, createMailer } from '@pipeforge/shared';
 import { resolveConnections } from './resolveConnections';
+import { isFinalAttempt } from './jobAttempts';
+import { shouldNotify } from './notificationGate';
 
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
@@ -40,8 +42,7 @@ const sendMail = createMailer({
 }, logger);
 
 async function notifyOwner(pipeline: any, ownerId: string, executionId: string, status: 'COMPLETED' | 'FAILED', errorMessage?: string) {
-  const wantsNotification = status === 'FAILED' ? pipeline.notifications?.onFailure : pipeline.notifications?.onComplete;
-  if (!wantsNotification) return;
+  if (!shouldNotify(pipeline, status)) return;
 
   try {
     const user = await UserContact.findById(ownerId).select('email name');
@@ -73,7 +74,7 @@ async function startWorker() {
     // BullMQ retries a failed job up to opts.attempts times before giving
     // up; only notify once it's truly done (the last attempt), not on every
     // transient retry in between.
-    const isFinalAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+    const isFinal = isFinalAttempt(job);
     logger.info({ jobId, executionId }, 'Processing execution');
 
     await Execution.findByIdAndUpdate(executionId, {
@@ -126,7 +127,7 @@ async function startWorker() {
       }, { new: true }).select('ownerId');
 
       publishUpdate({ type: 'STATUS', status: 'FAILED', error: error.message });
-      if (updated && isFinalAttempt) await notifyOwner(pipeline, updated.ownerId.toString(), executionId, 'FAILED', error.message);
+      if (updated && isFinal) await notifyOwner(pipeline, updated.ownerId.toString(), executionId, 'FAILED', error.message);
       throw error;
     }
   };
