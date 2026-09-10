@@ -76,14 +76,15 @@ export const executionController = {
 
       // The frozen snapshot only has {nodes, edges} — the worker also needs
       // the pipeline id (for routing live Socket.IO updates), name, and
-      // current notification preferences (those are a pipeline-level
-      // setting, not something to freeze from the original run), so merge
+      // current notification/webhook preferences (those are pipeline-level
+      // settings, not something to freeze from the original run), so merge
       // those in from the current pipeline while keeping the old snapshot's
       // nodes/edges as the thing that actually gets re-executed.
       await queueService.queueExecution(retry._id.toString(), {
         _id: pipeline._id,
         name: pipeline.name,
         notifications: pipeline.notifications,
+        webhook: pipeline.webhook,
         ...original.pipelineSnapshot
       });
 

@@ -22,6 +22,18 @@ export const pipelineSchema = new mongoose.Schema({
     // a pipeline on an hourly schedule would otherwise spam its owner.
     onFailure: { type: Boolean, default: true },
     onComplete: { type: Boolean, default: false },
+  },
+  // Outbound HTTP notification on execution complete/fail — same on/off
+  // shape as `notifications` above, plus a delivery target and a signing
+  // secret. The secret is encrypted at rest with CONNECTION_ENCRYPTION_KEY
+  // (see packages/shared/src/crypto.ts) the same way connection credentials
+  // are, and decrypted only when signing a delivery (worker) or showing it
+  // back to the pipeline's own owner/editor (api).
+  webhook: {
+    url: { type: String },
+    secretEncrypted: { type: String },
+    onFailure: { type: Boolean, default: true },
+    onComplete: { type: Boolean, default: false },
   }
 }, { timestamps: true });
 

@@ -70,9 +70,26 @@ components:
           properties:
             onFailure: { type: boolean, description: 'Default true' }
             onComplete: { type: boolean, description: 'Default false' }
+        webhook:
+          type: object
+          description: 'Whether an outbound webhook is configured. The signing secret is NOT included here — fetch it via GET .../webhook.'
+          properties:
+            configured: { type: boolean }
+            url: { type: string, nullable: true }
+            onFailure: { type: boolean, description: 'Default true' }
+            onComplete: { type: boolean, description: 'Default false' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         deletedAt: { type: string, format: date-time, nullable: true, description: 'Set when soft-deleted; restorable until then.' }
+    WebhookConfig:
+      type: object
+      nullable: true
+      description: 'null when no webhook is configured for this pipeline.'
+      properties:
+        url: { type: string }
+        secret: { type: string, description: 'HMAC-SHA256 signing secret, decrypted. Deliveries carry it as the "X-PipeForge-Signature" header: "sha256=" + hex HMAC of the raw JSON body.' }
+        onFailure: { type: boolean }
+        onComplete: { type: boolean }
     Execution:
       type: object
       properties:
@@ -526,6 +543,50 @@ paths:
         '200':
           description: OK
           content: { application/json: { schema: { $ref: '#/components/schemas/Pipeline' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/pipelines/{pipelineId}/webhook:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: Get this pipeline's webhook config, with its signing secret decrypted
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/WebhookConfig' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Set (or replace) this pipeline's outbound webhook
+      description: >
+        POSTs a signed JSON payload to `url` when the pipeline completes
+        and/or fails, per onFailure/onComplete. A signing secret is
+        generated the first time a webhook is set; it's kept stable across
+        further PUTs unless `regenerateSecret: true` is passed, so updating
+        just the URL or event flags doesn't silently invalidate a
+        receiver's existing signature verification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string }
+                onFailure: { type: boolean, description: 'Default true' }
+                onComplete: { type: boolean, description: 'Default false' }
+                regenerateSecret: { type: boolean, description: 'Default false' }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/WebhookConfig' } } }
+        '400': { description: Invalid or non-http(s) URL }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Remove this pipeline's webhook
+      responses:
+        '204': { description: Deleted }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /projects/{projectId}/pipelines/{pipelineId}/validate:

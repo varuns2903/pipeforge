@@ -2,11 +2,13 @@ import { Worker } from 'bullmq';
 import mongoose from 'mongoose';
 import Redis from 'ioredis';
 import { PipelineEngine, PipelineValidator } from '@pipeforge/pipeline-engine';
-import { executionSchema, pipelineSchema, createLogger, createMailer } from '@pipeforge/shared';
+import { executionSchema, pipelineSchema, createLogger, createMailer, decryptSecret } from '@pipeforge/shared';
 import { env } from './config/env';
 import { resolveConnections } from './resolveConnections';
 import { isFinalAttempt } from './jobAttempts';
 import { shouldNotify } from './notificationGate';
+import { shouldDeliverWebhook } from './webhookGate';
+import { signWebhookPayload } from './webhookSignature';
 
 const {
   MONGODB_URI,
@@ -53,6 +55,46 @@ async function notifyOwner(pipeline: any, ownerId: string, executionId: string, 
   } catch (err) {
     // A notification failure should never fail the execution itself.
     logger.error({ err, executionId }, 'Failed to send execution notification');
+  }
+}
+
+const WEBHOOK_TIMEOUT_MS = 5000;
+
+async function deliverWebhook(pipeline: any, executionId: string, status: 'COMPLETED' | 'FAILED', errorMessage?: string) {
+  if (!shouldDeliverWebhook(pipeline, status)) return;
+
+  try {
+    const secret = decryptSecret(pipeline.webhook.secretEncrypted, CONNECTION_ENCRYPTION_KEY);
+    const payload = JSON.stringify({
+      event: status === 'FAILED' ? 'execution.failed' : 'execution.completed',
+      executionId,
+      pipelineId: pipeline._id || pipeline.id,
+      pipelineName: pipeline.name,
+      status,
+      error: errorMessage ?? null,
+      timestamp: new Date().toISOString(),
+    });
+    const signature = signWebhookPayload(payload, secret);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+    try {
+      const res = await fetch(pipeline.webhook.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-PipeForge-Signature': `sha256=${signature}` },
+        body: payload,
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        logger.warn({ executionId, status: res.status }, 'Webhook delivery returned a non-2xx response');
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch (err) {
+    // Best-effort, single attempt — same reasoning as notifyOwner: a
+    // misbehaving receiver should never fail the execution itself.
+    logger.error({ err, executionId }, 'Failed to deliver execution webhook');
   }
 }
 
@@ -110,7 +152,10 @@ async function startWorker() {
 
       publishUpdate({ type: 'STATUS', status: 'COMPLETED', results });
       logger.info({ jobId, executionId }, 'Execution completed successfully');
-      if (updated) await notifyOwner(pipeline, updated.ownerId.toString(), executionId, 'COMPLETED');
+      if (updated) {
+        await notifyOwner(pipeline, updated.ownerId.toString(), executionId, 'COMPLETED');
+        await deliverWebhook(pipeline, executionId, 'COMPLETED');
+      }
     } catch (error: any) {
       logger.error({ jobId, executionId, err: error }, 'Execution failed');
       const updated = await Execution.findByIdAndUpdate(executionId, {
@@ -120,7 +165,10 @@ async function startWorker() {
       }, { new: true }).select('ownerId');
 
       publishUpdate({ type: 'STATUS', status: 'FAILED', error: error.message });
-      if (updated && isFinal) await notifyOwner(pipeline, updated.ownerId.toString(), executionId, 'FAILED', error.message);
+      if (updated && isFinal) {
+        await notifyOwner(pipeline, updated.ownerId.toString(), executionId, 'FAILED', error.message);
+        await deliverWebhook(pipeline, executionId, 'FAILED', error.message);
+      }
       throw error;
     }
   };

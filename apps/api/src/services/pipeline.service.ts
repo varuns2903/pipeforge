@@ -1,7 +1,10 @@
+import crypto from 'crypto';
 import { CronExpressionParser } from 'cron-parser';
+import { encryptSecret, decryptSecret } from '@pipeforge/shared';
 import { Pipeline } from '../models/Pipeline';
 import { projectService, ProjectRole } from './project.service';
 import { queueService } from './queue.service';
+import { CONNECTION_ENCRYPTION_KEY } from '../config/env';
 
 export class PipelineService {
   async create(name: string, projectId: string, ownerId: string) {
@@ -91,6 +94,60 @@ export class PipelineService {
     }
 
     pipeline.schedule = { cronExpression: undefined, timezone: undefined, enabled: false };
+    await pipeline.save();
+    return pipeline;
+  }
+
+  // Returns the webhook config with its signing secret decrypted, so the
+  // pipeline's owner/editor can copy it into whatever verifies deliveries on
+  // their receiving end. Read-only access (viewer) can see it too — same
+  // sensitivity level as being able to see the pipeline's definition.
+  async getWebhook(pipelineId: string, projectId: string, ownerId: string) {
+    const pipeline = await this.getById(pipelineId, projectId, ownerId, 'viewer');
+    if (!pipeline.webhook?.url) return null;
+    return {
+      url: pipeline.webhook.url,
+      secret: pipeline.webhook.secretEncrypted ? decryptSecret(pipeline.webhook.secretEncrypted, CONNECTION_ENCRYPTION_KEY) : null,
+      onFailure: !!pipeline.webhook.onFailure,
+      onComplete: !!pipeline.webhook.onComplete,
+    };
+  }
+
+  // Generates a new signing secret only the first time a webhook is set (or
+  // whenever `regenerateSecret` is explicitly requested) — updating just the
+  // URL or event flags shouldn't silently invalidate a receiver's existing
+  // verification setup.
+  async setWebhook(pipelineId: string, projectId: string, ownerId: string, data: { url: string, onFailure: boolean, onComplete: boolean, regenerateSecret?: boolean }) {
+    let parsed: URL;
+    try {
+      parsed = new URL(data.url);
+    } catch {
+      throw new Error('Invalid webhook URL');
+    }
+    // Format-only validation — this does not protect against SSRF (a URL
+    // that resolves to an internal address); the worker delivering this
+    // request runs inside the same trust boundary as the rest of the infra,
+    // so treat any webhook URL as able to reach internal services.
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Webhook URL must use http or https');
+    }
+
+    const pipeline = await this.getById(pipelineId, projectId, ownerId, 'editor');
+
+    let secretEncrypted = pipeline.webhook?.secretEncrypted;
+    if (!secretEncrypted || data.regenerateSecret) {
+      const plainSecret = crypto.randomBytes(24).toString('hex');
+      secretEncrypted = encryptSecret(plainSecret, CONNECTION_ENCRYPTION_KEY);
+    }
+
+    pipeline.webhook = { url: data.url, secretEncrypted, onFailure: data.onFailure, onComplete: data.onComplete };
+    await pipeline.save();
+    return this.getWebhook(pipelineId, projectId, ownerId);
+  }
+
+  async clearWebhook(pipelineId: string, projectId: string, ownerId: string) {
+    const pipeline = await this.getById(pipelineId, projectId, ownerId, 'editor');
+    pipeline.webhook = { url: undefined, secretEncrypted: undefined, onFailure: true, onComplete: false };
     await pipeline.save();
     return pipeline;
   }

@@ -21,6 +21,14 @@ const mapToDTO = (doc: any) => ({
     onFailure: doc.notifications?.onFailure ?? true,
     onComplete: doc.notifications?.onComplete ?? false,
   },
+  // Secret is intentionally omitted here — fetched separately via
+  // GET .../webhook, which decrypts it. This just says whether one's set.
+  webhook: {
+    configured: !!doc.webhook?.url,
+    url: doc.webhook?.url ?? null,
+    onFailure: doc.webhook?.onFailure ?? true,
+    onComplete: doc.webhook?.onComplete ?? false,
+  },
   createdAt: doc.createdAt.toISOString(),
   updatedAt: doc.updatedAt.toISOString(),
   deletedAt: doc.deletedAt ? doc.deletedAt.toISOString() : null,
@@ -121,6 +129,48 @@ export class PipelineController {
         (req.params.pipelineId as string), (req.params.projectId as string), req.user.id
       );
       res.json(mapToDTO(pipeline));
+    } catch (err: any) {
+      if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
+      next(err);
+    }
+  }
+
+  async getWebhook(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const webhook = await pipelineService.getWebhook(
+        (req.params.pipelineId as string), (req.params.projectId as string), req.user.id
+      );
+      res.json(webhook);
+    } catch (err: any) {
+      if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
+      next(err);
+    }
+  }
+
+  async setWebhook(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { url, onFailure, onComplete, regenerateSecret } = req.body;
+      if (!url) return res.status(400).json({ error: 'url is required' });
+      const webhook = await pipelineService.setWebhook(
+        (req.params.pipelineId as string), (req.params.projectId as string), req.user.id,
+        { url, onFailure: !!onFailure, onComplete: !!onComplete, regenerateSecret: !!regenerateSecret }
+      );
+      res.json(webhook);
+    } catch (err: any) {
+      if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
+      if (err.message.startsWith('Invalid webhook URL') || err.message.startsWith('Webhook URL must')) {
+        return res.status(400).json({ error: err.message });
+      }
+      next(err);
+    }
+  }
+
+  async clearWebhook(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      await pipelineService.clearWebhook(
+        (req.params.pipelineId as string), (req.params.projectId as string), req.user.id
+      );
+      res.status(204).send();
     } catch (err: any) {
       if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
       next(err);

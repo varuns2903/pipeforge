@@ -55,3 +55,6 @@ projectRouter.delete('/:projectId/pipelines/:pipelineId', pipelineController.del
 projectRouter.post('/:projectId/pipelines/:pipelineId/restore', pipelineController.restore);
 projectRouter.put('/:projectId/pipelines/:pipelineId/schedule', pipelineController.setSchedule);
 projectRouter.delete('/:projectId/pipelines/:pipelineId/schedule', pipelineController.clearSchedule);
+projectRouter.get('/:projectId/pipelines/:pipelineId/webhook', pipelineController.getWebhook);
+projectRouter.put('/:projectId/pipelines/:pipelineId/webhook', pipelineController.setWebhook);
+projectRouter.delete('/:projectId/pipelines/:pipelineId/webhook', pipelineController.clearWebhook);

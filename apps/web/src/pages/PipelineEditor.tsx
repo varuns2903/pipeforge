@@ -15,7 +15,7 @@ import type { Connection, Edge, Node } from '@xyflow/react';
 import { useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { api } from '../lib/api';
-import { ArrowLeft, Save, Play, Check, ShieldCheck, AlertTriangle, Clock, Calendar, Bell } from 'lucide-react';
+import { ArrowLeft, Save, Play, Check, ShieldCheck, AlertTriangle, Clock, Calendar, Bell, Webhook as WebhookIcon } from 'lucide-react';
 
 import { CustomNode } from '../components/editor/CustomNode';
 import { NodePalette } from '../components/editor/NodePalette';
@@ -24,6 +24,7 @@ import { ExecutionDrawer } from '../components/editor/ExecutionDrawer';
 import { HistoryModal } from '../components/editor/HistoryModal';
 import { ScheduleModal } from '../components/editor/ScheduleModal';
 import { NotificationsModal } from '../components/editor/NotificationsModal';
+import { WebhookModal } from '../components/editor/WebhookModal';
 import { DirectionContext } from '../components/editor/DirectionContext';
 import { LayoutList, LayoutPanelLeft } from 'lucide-react';
 import { getLayoutedElements } from '../components/editor/layout';
@@ -47,6 +48,7 @@ function EditorCanvas() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isWebhookOpen, setIsWebhookOpen] = useState(false);
   const [direction, setDirection] = useState<'TB' | 'LR'>('TB');
 
   const { data: pipeline, isLoading } = useQuery({
@@ -198,6 +200,12 @@ function EditorCanvas() {
           >
             <Bell size={14} /> Notifications
           </button>
+          <button
+            onClick={() => setIsWebhookOpen(true)}
+            className={`glass-button px-3 py-1.5 rounded flex items-center gap-2 text-sm hover:text-text-primary ${pipeline?.webhook?.configured ? 'text-accent-500' : 'text-text-secondary'}`}
+          >
+            <WebhookIcon size={14} /> Webhook
+          </button>
           <button onClick={handleValidate} className="glass-button px-3 py-1.5 rounded flex items-center gap-2 text-sm text-status-warning hover:text-status-warning">
             <ShieldCheck size={14} /> Validate
           </button>
@@ -284,6 +292,13 @@ function EditorCanvas() {
             pipelineId={pipelineId!}
             notifications={pipeline?.notifications || { onFailure: true, onComplete: false }}
             onClose={() => setIsNotificationsOpen(false)}
+          />
+        )}
+        {isWebhookOpen && (
+          <WebhookModal
+            projectId={projectId!}
+            pipelineId={pipelineId!}
+            onClose={() => setIsWebhookOpen(false)}
           />
         )}
       </div>
