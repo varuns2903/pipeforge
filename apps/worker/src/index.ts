@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import Redis from 'ioredis';
 import { PipelineEngine, PipelineValidator } from '@pipeforge/pipeline-engine';
-import { executionSchema, pipelineSchema, createLogger } from '@pipeforge/shared';
+import { executionSchema, pipelineSchema, createLogger, createMailer } from '@pipeforge/shared';
 import { resolveConnections } from './resolveConnections';
 
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
@@ -13,6 +13,7 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pipefo
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6380', 10);
 const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
+const WEB_URL = process.env.WEB_URL || 'http://localhost:5173';
 if (!process.env.CONNECTION_ENCRYPTION_KEY) {
   throw new Error('Missing required environment variable: CONNECTION_ENCRYPTION_KEY');
 }
@@ -25,7 +26,41 @@ const redisPublisher = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
 
 const Execution = mongoose.model('Execution', executionSchema);
 const Pipeline = mongoose.model('Pipeline', pipelineSchema);
+// Only the fields this process actually needs from the users collection —
+// deliberately not the full User schema (password hash, tokens, etc.), which
+// lives in apps/api and this process has no business reading.
+const UserContact = mongoose.model('User', new mongoose.Schema({ email: String, name: String }));
 const logger = createLogger('worker');
+const sendMail = createMailer({
+  smtpHost: process.env.SMTP_HOST,
+  smtpPort: parseInt(process.env.SMTP_PORT || '587', 10),
+  smtpUser: process.env.SMTP_USER,
+  smtpPass: process.env.SMTP_PASS,
+  mailFrom: process.env.MAIL_FROM || 'PipeForge <no-reply@pipeforge.local>',
+}, logger);
+
+async function notifyOwner(pipeline: any, ownerId: string, executionId: string, status: 'COMPLETED' | 'FAILED', errorMessage?: string) {
+  const wantsNotification = status === 'FAILED' ? pipeline.notifications?.onFailure : pipeline.notifications?.onComplete;
+  if (!wantsNotification) return;
+
+  try {
+    const user = await UserContact.findById(ownerId).select('email name');
+    if (!user?.email) return;
+
+    const link = `${WEB_URL}/projects/${pipeline.projectId}/pipelines/${pipeline._id || pipeline.id}`;
+    const subject = status === 'FAILED'
+      ? `Pipeline "${pipeline.name}" failed`
+      : `Pipeline "${pipeline.name}" completed`;
+    const text = status === 'FAILED'
+      ? `Your pipeline "${pipeline.name}" failed to run.\n\nError: ${errorMessage}\n\nView it: ${link}`
+      : `Your pipeline "${pipeline.name}" completed successfully.\n\nView it: ${link}`;
+
+    await sendMail({ to: user.email, subject, text });
+  } catch (err) {
+    // A notification failure should never fail the execution itself.
+    logger.error({ err, executionId }, 'Failed to send execution notification');
+  }
+}
 
 async function startWorker() {
   await mongoose.connect(MONGODB_URI);
@@ -33,7 +68,12 @@ async function startWorker() {
 
   const engine = new PipelineEngine();
 
-  const runPipeline = async (jobId: string | undefined, executionId: string, pipeline: any) => {
+  const runPipeline = async (job: { id?: string; attemptsMade: number; opts: { attempts?: number } }, executionId: string, pipeline: any) => {
+    const jobId = job.id;
+    // BullMQ retries a failed job up to opts.attempts times before giving
+    // up; only notify once it's truly done (the last attempt), not on every
+    // transient retry in between.
+    const isFinalAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
     logger.info({ jobId, executionId }, 'Processing execution');
 
     await Execution.findByIdAndUpdate(executionId, {
@@ -68,23 +108,25 @@ async function startWorker() {
         }
       });
 
-      await Execution.findByIdAndUpdate(executionId, {
+      const updated = await Execution.findByIdAndUpdate(executionId, {
         status: 'COMPLETED',
         completedAt: new Date(),
         results
-      });
+      }, { new: true }).select('ownerId');
 
       publishUpdate({ type: 'STATUS', status: 'COMPLETED', results });
       logger.info({ jobId, executionId }, 'Execution completed successfully');
+      if (updated) await notifyOwner(pipeline, updated.ownerId.toString(), executionId, 'COMPLETED');
     } catch (error: any) {
       logger.error({ jobId, executionId, err: error }, 'Execution failed');
-      await Execution.findByIdAndUpdate(executionId, {
+      const updated = await Execution.findByIdAndUpdate(executionId, {
         status: 'FAILED',
         completedAt: new Date(),
         error: error.message
-      });
+      }, { new: true }).select('ownerId');
 
       publishUpdate({ type: 'STATUS', status: 'FAILED', error: error.message });
+      if (updated && isFinalAttempt) await notifyOwner(pipeline, updated.ownerId.toString(), executionId, 'FAILED', error.message);
       throw error;
     }
   };
@@ -116,10 +158,10 @@ async function startWorker() {
         status: 'PENDING'
       });
 
-      await runPipeline(job.id, execution._id.toString(), pipeline);
+      await runPipeline(job, execution._id.toString(), pipeline);
     } else {
       const { executionId, pipeline } = job.data;
-      await runPipeline(job.id, executionId, pipeline);
+      await runPipeline(job, executionId, pipeline);
     }
   }, {
     connection: {

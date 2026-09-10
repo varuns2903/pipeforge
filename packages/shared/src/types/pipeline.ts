@@ -4,6 +4,11 @@ export interface PipelineSchedule {
   enabled: boolean;
 }
 
+export interface PipelineNotifications {
+  onFailure: boolean;
+  onComplete: boolean;
+}
+
 export interface Pipeline {
   id: string;
   projectId: string;
@@ -11,6 +16,7 @@ export interface Pipeline {
   nodes: any[];
   edges: any[];
   schedule?: PipelineSchedule;
+  notifications?: PipelineNotifications;
   createdAt: string;
   updatedAt: string;
 }

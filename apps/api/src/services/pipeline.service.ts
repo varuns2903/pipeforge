@@ -25,7 +25,7 @@ export class PipelineService {
     return pipeline;
   }
 
-  async update(pipelineId: string, projectId: string, ownerId: string, data: { name?: string, nodes?: any[], edges?: any[] }) {
+  async update(pipelineId: string, projectId: string, ownerId: string, data: { name?: string, nodes?: any[], edges?: any[], notifications?: { onFailure?: boolean, onComplete?: boolean } }) {
     await projectService.getById(projectId, ownerId);
     const pipeline = await Pipeline.findOneAndUpdate(
       { _id: pipelineId, projectId, deletedAt: null },

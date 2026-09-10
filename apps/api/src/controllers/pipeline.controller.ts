@@ -17,6 +17,10 @@ const mapToDTO = (doc: any) => ({
     timezone: doc.schedule.timezone ?? null,
     enabled: !!doc.schedule.enabled,
   } : { cronExpression: null, timezone: null, enabled: false },
+  notifications: {
+    onFailure: doc.notifications?.onFailure ?? true,
+    onComplete: doc.notifications?.onComplete ?? false,
+  },
   createdAt: doc.createdAt.toISOString(),
   updatedAt: doc.updatedAt.toISOString(),
 });
@@ -54,8 +58,8 @@ export class PipelineController {
 
   async update(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { name, nodes, edges } = req.body;
-      const pipeline = await pipelineService.update((req.params.pipelineId as string), (req.params.projectId as string), req.user.id, { name, nodes, edges });
+      const { name, nodes, edges, notifications } = req.body;
+      const pipeline = await pipelineService.update((req.params.pipelineId as string), (req.params.projectId as string), req.user.id, { name, nodes, edges, notifications });
       res.json(mapToDTO(pipeline));
     } catch (err: any) {
       if (err.message.includes('not found')) return res.status(404).json({ error: err.message });

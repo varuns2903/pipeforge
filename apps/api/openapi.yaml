@@ -55,6 +55,12 @@ components:
             cronExpression: { type: string, nullable: true }
             timezone: { type: string, nullable: true }
             enabled: { type: boolean }
+        notifications:
+          type: object
+          description: 'Email the owner when this pipeline finishes running. Set via PUT on this pipeline.'
+          properties:
+            onFailure: { type: boolean, description: 'Default true' }
+            onComplete: { type: boolean, description: 'Default false' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     Execution:
@@ -356,7 +362,7 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/Pipeline' } } }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
-      summary: Update a pipeline's name, nodes, and/or edges
+      summary: Update a pipeline's name, nodes, edges, and/or notification preferences
       requestBody:
         content:
           application/json:
@@ -366,6 +372,11 @@ paths:
                 name: { type: string }
                 nodes: { type: array, items: { type: object } }
                 edges: { type: array, items: { type: object } }
+                notifications:
+                  type: object
+                  properties:
+                    onFailure: { type: boolean }
+                    onComplete: { type: boolean }
       responses:
         '200':
           description: OK

@@ -16,6 +16,12 @@ export const pipelineSchema = new mongoose.Schema({
     // The pipeline's own _id doubles as its BullMQ job scheduler id, so
     // there's no separate key to persist — see queue.service.ts.
     enabled: { type: Boolean, default: false },
+  },
+  notifications: {
+    // Failure defaults on (the actionable case); completion defaults off —
+    // a pipeline on an hourly schedule would otherwise spam its owner.
+    onFailure: { type: Boolean, default: true },
+    onComplete: { type: Boolean, default: false },
   }
 }, { timestamps: true });
 
