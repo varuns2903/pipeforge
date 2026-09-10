@@ -5,7 +5,9 @@ import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAuth, AuthRequest } from '../middleware/auth.middleware';
 import { File } from '../models/File';
-import { MAX_USER_STORAGE_MB, MAX_FILE_SIZE_MB } from '../config/env';
+import { User } from '../models/User';
+import { MAX_FILE_SIZE_MB } from '../config/env';
+import { getPlanLimits } from '../config/plans';
 import fs from 'fs';
 
 const router = Router();
@@ -20,7 +22,6 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => cb(null, `${uuidv4()}-${sanitizeFilename(file.originalname)}`)
 });
 
-const MAX_USER_STORAGE_BYTES = MAX_USER_STORAGE_MB * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.csv', '.json']);
 
 const upload = multer({
@@ -46,15 +47,19 @@ router.post('/upload', requireAuth, (req: AuthRequest, res) => {
     // Storage quota is checked after the write (multer needs to see the file
     // to know its size) — if it pushes the user over quota, delete it again
     // rather than leaving an orphaned file with no File record.
-    const { _sum } = (await File.aggregate([
-      { $match: { ownerId: new mongoose.Types.ObjectId(req.user.id) } },
-      { $group: { _id: null, _sum: { $sum: '$size' } } }
-    ]))[0] || { _sum: 0 };
+    const [{ _sum } = { _sum: 0 }, user] = await Promise.all([
+      File.aggregate([
+        { $match: { ownerId: new mongoose.Types.ObjectId(req.user.id) } },
+        { $group: { _id: null, _sum: { $sum: '$size' } } }
+      ]).then(r => r[0]),
+      User.findById(req.user.id).select('plan')
+    ]);
 
-    if (_sum + req.file.size > MAX_USER_STORAGE_BYTES) {
+    const { maxStorageMB } = getPlanLimits(user?.plan);
+    if (_sum + req.file.size > maxStorageMB * 1024 * 1024) {
       fs.unlink(req.file.path, () => {});
       return res.status(413).json({
-        error: `Uploading this file would exceed your ${MAX_USER_STORAGE_MB}MB storage quota.`
+        error: `Uploading this file would exceed your ${maxStorageMB}MB storage quota.`
       });
     }
 

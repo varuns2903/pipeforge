@@ -3,31 +3,35 @@ import mongoose from 'mongoose';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { File } from '../models/File';
 import { Execution } from '../models/Execution';
-import { MAX_USER_STORAGE_MB, MAX_CONCURRENT_EXECUTIONS_PER_USER } from '../config/env';
+import { User } from '../models/User';
+import { getPlanLimits } from '../config/plans';
 
 export class UsageController {
   async get(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const ownerId = new mongoose.Types.ObjectId(req.user.id);
 
-      const [storageResult, activeExecutions] = await Promise.all([
+      const [storageResult, activeExecutions, user] = await Promise.all([
         File.aggregate([
           { $match: { ownerId } },
           { $group: { _id: null, totalBytes: { $sum: '$size' } } }
         ]),
-        Execution.countDocuments({ ownerId, status: { $in: ['PENDING', 'RUNNING'] } })
+        Execution.countDocuments({ ownerId, status: { $in: ['PENDING', 'RUNNING'] } }),
+        User.findById(req.user.id).select('plan')
       ]);
 
       const usedBytes = storageResult[0]?.totalBytes || 0;
+      const limits = getPlanLimits(user?.plan);
 
       res.json({
+        plan: user?.plan || 'free',
         storage: {
           usedBytes,
-          limitBytes: MAX_USER_STORAGE_MB * 1024 * 1024,
+          limitBytes: limits.maxStorageMB * 1024 * 1024,
         },
         executions: {
           active: activeExecutions,
-          limit: MAX_CONCURRENT_EXECUTIONS_PER_USER,
+          limit: limits.maxConcurrentExecutions,
         }
       });
     } catch (err) { next(err); }

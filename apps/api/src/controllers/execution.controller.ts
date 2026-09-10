@@ -3,7 +3,7 @@ import { Execution } from '../models/Execution';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { pipelineService } from '../services/pipeline.service';
 import { queueService } from '../services/queue.service';
-import { MAX_CONCURRENT_EXECUTIONS_PER_USER } from '../config/env';
+import { getConcurrentExecutionLimit } from '../services/quota.service';
 
 export const executionController = {
   async listExecutions(req: AuthRequest, res: Response) {
@@ -55,13 +55,13 @@ export const executionController = {
       const original = await Execution.findOne({ _id: executionId, pipelineId });
       if (!original) return res.status(404).json({ error: 'Execution not found' });
 
-      const activeCount = await Execution.countDocuments({
-        ownerId: req.user.id,
-        status: { $in: ['PENDING', 'RUNNING'] }
-      });
-      if (activeCount >= MAX_CONCURRENT_EXECUTIONS_PER_USER) {
+      const [activeCount, executionLimit] = await Promise.all([
+        Execution.countDocuments({ ownerId: req.user.id, status: { $in: ['PENDING', 'RUNNING'] } }),
+        getConcurrentExecutionLimit(req.user.id),
+      ]);
+      if (activeCount >= executionLimit) {
         return res.status(429).json({
-          error: `You have ${activeCount} pipeline executions already running. Wait for one to finish before starting another (limit: ${MAX_CONCURRENT_EXECUTIONS_PER_USER}).`
+          error: `You have ${activeCount} pipeline executions already running. Wait for one to finish before starting another (limit: ${executionLimit}).`
         });
       }
 

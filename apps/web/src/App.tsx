@@ -15,6 +15,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail').then(m => ({ default: m.ProjectDetail })));
 const PipelineEditor = lazy(() => import('./pages/PipelineEditor').then(m => ({ default: m.PipelineEditor })));
 const Connections = lazy(() => import('./pages/Connections').then(m => ({ default: m.Connections })));
+const Billing = lazy(() => import('./pages/Billing').then(m => ({ default: m.Billing })));
 
 function RouteFallback() {
   return <div className="min-h-screen bg-background flex items-center justify-center text-text-secondary">Loading...</div>;
@@ -37,6 +38,7 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/projects/:projectId" element={<ProjectDetail />} />
               <Route path="/connections" element={<Connections />} />
+              <Route path="/billing" element={<Billing />} />
             </Route>
 
             {/* Fullscreen Editor Route */}

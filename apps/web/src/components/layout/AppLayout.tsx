@@ -1,6 +1,6 @@
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { Database, LayoutDashboard, PlayCircle, BoxSelect, UserCircle, Plug } from 'lucide-react';
+import { Database, LayoutDashboard, PlayCircle, BoxSelect, UserCircle, Plug, CreditCard } from 'lucide-react';
 
 export function AppLayout() {
   const { user, logout } = useAuthStore();
@@ -12,6 +12,7 @@ export function AppLayout() {
     { icon: Database, label: 'Datasets', path: '/datasets' },
     { icon: PlayCircle, label: 'Executions', path: '/executions' },
     { icon: BoxSelect, label: 'Templates', path: '/templates' },
+    { icon: CreditCard, label: 'Billing', path: '/billing' },
   ];
 
   return (

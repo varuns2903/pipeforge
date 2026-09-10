@@ -30,11 +30,25 @@ const schema = z.object({
   SMTP_PASS: z.string().min(1).optional(),
   MAIL_FROM: z.string().min(1).default('PipeForge <no-reply@pipeforge.local>'),
 
-  // Per-user quotas — reasonable defaults, no plan tiers. Both configurable
-  // via env so they can be tuned without a code change as real usage comes in.
+  // Per-user quotas for the Free plan — see config/plans.ts, which derives
+  // the Pro plan's (higher) limits from these. Configurable via env so both
+  // can be tuned without a code change as real usage comes in.
   MAX_USER_STORAGE_MB: z.coerce.number().positive().default(500),
   MAX_CONCURRENT_EXECUTIONS_PER_USER: z.coerce.number().int().positive().default(5),
   MAX_FILE_SIZE_MB: z.coerce.number().positive().default(50),
+
+  // Stripe (test mode) — powers the Pro plan upgrade flow. The secret key
+  // and price id have no insecure fallback (refuse to start rather than
+  // silently accept checkouts that can't be fulfilled). The webhook secret
+  // is the one exception: it doesn't exist until `stripe listen` (local) or
+  // a dashboard webhook endpoint (deployed) is set up, which needs this
+  // server already running to point at — so it's optional here, and
+  // billing.service.ts raises a clear error per-request if a webhook
+  // actually arrives before it's configured, rather than blocking startup.
+  STRIPE_SECRET_KEY: z.string().startsWith('sk_', 'must be a Stripe secret key (starts "sk_")'),
+  STRIPE_WEBHOOK_SECRET: z.string().optional()
+    .refine(v => !v || v.startsWith('whsec_'), 'must be a Stripe webhook signing secret (starts "whsec_")'),
+  STRIPE_PRICE_ID_PRO: z.string().startsWith('price_', 'must be a Stripe Price id (starts "price_"), not a Product id'),
 });
 
 const env = loadEnv(schema);
@@ -64,3 +78,9 @@ export const MAIL_FROM = env.MAIL_FROM;
 export const MAX_USER_STORAGE_MB = env.MAX_USER_STORAGE_MB;
 export const MAX_CONCURRENT_EXECUTIONS_PER_USER = env.MAX_CONCURRENT_EXECUTIONS_PER_USER;
 export const MAX_FILE_SIZE_MB = env.MAX_FILE_SIZE_MB;
+
+export const STRIPE_SECRET_KEY = env.STRIPE_SECRET_KEY;
+// Normalize an empty string (as set in .env before `stripe listen` has run)
+// to undefined, so callers can use a plain truthiness check.
+export const STRIPE_WEBHOOK_SECRET = env.STRIPE_WEBHOOK_SECRET || undefined;
+export const STRIPE_PRICE_ID_PRO = env.STRIPE_PRICE_ID_PRO;

@@ -4,7 +4,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { PipelineValidator } from '@pipeforge/pipeline-engine';
 import { Execution } from '../models/Execution';
 import { queueService } from '../services/queue.service';
-import { MAX_CONCURRENT_EXECUTIONS_PER_USER } from '../config/env';
+import { getConcurrentExecutionLimit } from '../services/quota.service';
 
 const mapToDTO = (doc: any) => ({
   id: doc._id.toString(),
@@ -199,13 +199,13 @@ export class PipelineController {
         return res.status(400).json({ error: 'Pipeline is invalid', details: validation.errors });
       }
 
-      const activeCount = await Execution.countDocuments({
-        ownerId: req.user.id,
-        status: { $in: ['PENDING', 'RUNNING'] }
-      });
-      if (activeCount >= MAX_CONCURRENT_EXECUTIONS_PER_USER) {
+      const [activeCount, executionLimit] = await Promise.all([
+        Execution.countDocuments({ ownerId: req.user.id, status: { $in: ['PENDING', 'RUNNING'] } }),
+        getConcurrentExecutionLimit(req.user.id),
+      ]);
+      if (activeCount >= executionLimit) {
         return res.status(429).json({
-          error: `You have ${activeCount} pipeline executions already running. Wait for one to finish before starting another (limit: ${MAX_CONCURRENT_EXECUTIONS_PER_USER}).`
+          error: `You have ${activeCount} pipeline executions already running. Wait for one to finish before starting another (limit: ${executionLimit}).`
         });
       }
 

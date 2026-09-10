@@ -90,6 +90,13 @@ components:
         secret: { type: string, description: 'HMAC-SHA256 signing secret, decrypted. Deliveries carry it as the "X-PipeForge-Signature" header: "sha256=" + hex HMAC of the raw JSON body.' }
         onFailure: { type: boolean }
         onComplete: { type: boolean }
+    PlanSummary:
+      type: object
+      properties:
+        id: { type: string, enum: [free, pro] }
+        name: { type: string }
+        maxStorageMB: { type: number }
+        maxConcurrentExecutions: { type: integer }
     Execution:
       type: object
       properties:
@@ -768,13 +775,57 @@ paths:
               schema:
                 type: object
                 properties:
+                  plan: { type: string, enum: [free, pro] }
                   storage:
                     type: object
                     properties:
                       usedBytes: { type: integer }
-                      limitBytes: { type: integer, description: MAX_USER_STORAGE_MB in bytes }
+                      limitBytes: { type: integer, description: "The user's plan storage limit, in bytes" }
                   executions:
                     type: object
                     properties:
                       active: { type: integer, description: 'Count of PENDING/RUNNING executions' }
-                      limit: { type: integer, description: MAX_CONCURRENT_EXECUTIONS_PER_USER }
+                      limit: { type: integer, description: "The user's plan concurrent-execution limit" }
+
+  /billing/plan:
+    get:
+      summary: Get the current user's plan, subscription status, and all available plans
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plan: { type: string, enum: [free, pro] }
+                  subscriptionStatus: { type: string, nullable: true, description: 'Raw Stripe subscription status (active, past_due, canceled, ...), null if never subscribed' }
+                  limits: { $ref: '#/components/schemas/PlanSummary' }
+                  plans:
+                    type: array
+                    items: { $ref: '#/components/schemas/PlanSummary' }
+
+  /billing/checkout:
+    post:
+      summary: Create a Stripe Checkout session to upgrade to Pro
+      description: Creates (or reuses) a Stripe customer for the user, then a subscription Checkout session for the Pro plan. Redirect the browser to the returned URL.
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { type: object, properties: { url: { type: string } } } } }
+
+  /billing/portal:
+    post:
+      summary: Create a Stripe billing portal session (manage payment method, view invoices, cancel)
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { type: object, properties: { url: { type: string } } } } }
+        '400': { description: 'User has no billing account yet (has never checked out)' }
+
+  /billing/webhook:
+    post:
+      summary: Stripe webhook receiver (not authenticated with a user session — verified via the Stripe-Signature header instead)
+      responses:
+        '200': { description: Event processed }
+        '400': { description: Missing or invalid Stripe-Signature header }

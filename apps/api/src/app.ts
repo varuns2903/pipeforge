@@ -15,6 +15,8 @@ import { projectRouter } from './routes/project.routes';
 import { fileRouter } from './routes/file.routes';
 import { connectionRouter } from './routes/connection.routes';
 import { usageRouter } from './routes/usage.routes';
+import { billingRouter } from './routes/billing.routes';
+import { billingController } from './controllers/billing.controller';
 
 export { logger };
 
@@ -24,6 +26,12 @@ app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/healthz
 // credentials: true is required for the browser to send/receive the httpOnly
 // auth cookie cross-origin; the frontend must set axios's withCredentials to match.
 app.use(cors({ origin: WEB_URL, credentials: true }));
+
+// Mounted BEFORE express.json(): Stripe's webhook signature is computed over
+// the exact raw request bytes, so this route needs the unparsed Buffer body
+// rather than the parsed object every other route gets.
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), billingController.webhook);
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -42,6 +50,7 @@ app.use('/api/projects', projectRouter);
 app.use('/api/files', fileRouter);
 app.use('/api/connections', connectionRouter);
 app.use('/api/usage', usageRouter);
+app.use('/api/billing', billingRouter);
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   req.log.error({ err }, 'Unhandled error');
