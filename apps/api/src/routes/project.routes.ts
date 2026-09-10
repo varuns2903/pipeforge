@@ -38,6 +38,7 @@ projectRouter.get('/:projectId/pipelines/:pipelineId/validate', pipelineControll
 projectRouter.post('/:projectId/pipelines/:pipelineId/run', pipelineController.run);
 projectRouter.get('/:projectId/pipelines/:pipelineId/executions', executionController.listExecutions);
 projectRouter.get('/:projectId/pipelines/:pipelineId/executions/:executionId', executionController.getExecution);
+projectRouter.post('/:projectId/pipelines/:pipelineId/executions/:executionId/retry', executionController.retryExecution);
 projectRouter.put('/:projectId/pipelines/:pipelineId', pipelineController.update);
 projectRouter.delete('/:projectId/pipelines/:pipelineId', pipelineController.delete);
 projectRouter.post('/:projectId/pipelines/:pipelineId/restore', pipelineController.restore);

@@ -1,18 +1,30 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { X, Clock, CheckCircle, AlertTriangle, Download, Settings } from 'lucide-react';
+import { X, Clock, CheckCircle, AlertTriangle, Download, Settings, RotateCcw } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 
 export function HistoryModal({ onClose }: { onClose: () => void }) {
   const { projectId, pipelineId } = useParams<{ projectId: string, pipelineId: string }>();
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: runs, isLoading } = useQuery({
     queryKey: ['executions', pipelineId],
     queryFn: async () => {
       const res = await api.get(`/projects/${projectId}/pipelines/${pipelineId}/executions`);
       return res.data;
+    }
+  });
+
+  const retryRun = useMutation({
+    mutationFn: async (executionId: string) => {
+      const res = await api.post(`/projects/${projectId}/pipelines/${pipelineId}/executions/${executionId}/retry`);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['executions', pipelineId] });
+      setSelectedRun(data.id);
     }
   });
 
@@ -119,7 +131,7 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
                   {runs?.map((run: any) => (
                     <li 
                       key={run._id}
-                      onClick={() => setSelectedRun(run._id)}
+                      onClick={() => { setSelectedRun(run._id); retryRun.reset(); }}
                       className={`p-4 hover:bg-surface-2 cursor-pointer transition-colors ${selectedRun === run._id ? 'bg-surface-2 border-l-2 border-accent-500' : 'border-l-2 border-transparent'}`}
                     >
                       <div className="flex items-center justify-between mb-2">
@@ -154,8 +166,30 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
                 <div className="p-6 border-b border-border-strong bg-surface-2">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-medium text-text-primary">Run {runDetail._id.slice(-6)}</h3>
-                    {renderStatus(runDetail.status)}
+                    <div className="flex items-center gap-3">
+                      {renderStatus(runDetail.status)}
+                      {(runDetail.status === 'FAILED' || runDetail.status === 'COMPLETED') && (
+                        <button
+                          onClick={() => retryRun.mutate(runDetail._id)}
+                          disabled={retryRun.isPending}
+                          className="text-xs flex items-center gap-1.5 text-text-secondary hover:text-text-primary bg-surface-3 hover:bg-surface-3/80 px-2.5 py-1 rounded disabled:opacity-50"
+                          title="Re-run this exact pipeline snapshot"
+                        >
+                          <RotateCcw size={12} /> {retryRun.isPending ? 'Retrying...' : 'Retry'}
+                        </button>
+                      )}
+                    </div>
                   </div>
+                  {retryRun.isError && (
+                    <div className="mb-4 p-2 bg-status-error/10 border border-status-error/20 text-status-error text-xs rounded">
+                      {(retryRun.error as any)?.response?.data?.error || 'Failed to queue retry'}
+                    </div>
+                  )}
+                  {retryRun.isSuccess && (
+                    <div className="mb-4 p-2 bg-status-success/10 border border-status-success/20 text-status-success text-xs rounded">
+                      Retry queued — selected below once it appears.
+                    </div>
+                  )}
                   {runDetail.pipelineSnapshot && (
                     <div className="mb-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-3 border border-border-strong text-xs text-text-secondary">
                       <Settings size={12} className="text-accent-500" />

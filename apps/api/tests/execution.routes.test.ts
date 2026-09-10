@@ -90,3 +90,52 @@ describe('Execution ownership (IDOR protection)', () => {
     expect(res.body.results.secret).toBe('owner-only-data');
   });
 });
+
+describe('Execution retry', () => {
+  let snapshotExecutionId: string;
+
+  beforeAll(async () => {
+    await request(app)
+      .put(`/api/projects/${projectId}/pipelines/${pipelineId}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({
+        nodes: [{ id: '1', data: { nodeType: 'csv-input', label: 'In', config: { filePath: 'mock' } } }],
+        edges: []
+      });
+
+    const execution = await Execution.create({
+      pipelineId,
+      projectId,
+      ownerId: (await request(app).get('/api/auth/me').set('Authorization', `Bearer ${tokenA}`)).body.user.id,
+      status: 'FAILED',
+      error: 'File not found',
+      pipelineSnapshot: {
+        nodes: [{ id: '1', data: { nodeType: 'csv-input', label: 'In', config: { filePath: 'mock' } } }],
+        edges: []
+      }
+    });
+    snapshotExecutionId = execution._id.toString();
+  });
+
+  it('denies another user from retrying', async () => {
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/pipelines/${pipelineId}/executions/${snapshotExecutionId}/retry`)
+      .set('Authorization', `Bearer ${tokenB}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('queues a new execution reusing the original snapshot', async () => {
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/pipelines/${pipelineId}/executions/${snapshotExecutionId}/retry`)
+      .set('Authorization', `Bearer ${tokenA}`);
+
+    expect(res.status).toBe(202);
+    expect(res.body.id).not.toBe(snapshotExecutionId); // a genuinely new execution, not the old one reused
+    expect(res.body.status).toBe('PENDING');
+
+    const newExecution = await Execution.findById(res.body.id);
+    expect(newExecution?.pipelineSnapshot.nodes).toEqual([
+      { id: '1', data: { nodeType: 'csv-input', label: 'In', config: { filePath: 'mock' } } }
+    ]);
+  });
+});

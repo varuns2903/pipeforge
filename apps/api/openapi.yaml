@@ -502,6 +502,31 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/Execution' } } }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /projects/{projectId}/pipelines/{pipelineId}/executions/{executionId}/retry:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+      - { name: executionId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: Re-run a past execution's exact frozen pipeline snapshot
+      description: >
+        Re-executes the nodes/edges captured at the time of the original
+        run, not the pipeline's current definition — so a retry is an
+        apples-to-apples attempt, unaffected by edits made since. Current
+        notification preferences still apply.
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  status: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { description: 'Too many active executions for this user (MAX_CONCURRENT_EXECUTIONS_PER_USER)' }
+
   /files/upload:
     post:
       summary: Upload a .csv or .json dataset (used as a pipeline's csv-input/json-input source)
