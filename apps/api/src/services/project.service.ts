@@ -42,6 +42,10 @@ export class ProjectService {
     return project;
   }
 
+  async listTrashed(ownerId: string) {
+    return Project.find({ ownerId, deletedAt: { $ne: null } }).sort({ deletedAt: -1 }).limit(200);
+  }
+
   async restore(projectId: string, ownerId: string) {
     const project = await Project.findOneAndUpdate(
       { _id: projectId, ownerId, deletedAt: { $ne: null } },

@@ -5,11 +5,13 @@ import { api } from '../lib/api';
 import type { Project } from '@pipeforge/shared';
 import { Folder, Plus, Trash2 } from 'lucide-react';
 import { UsageWidget } from '../components/UsageWidget';
+import { TrashModal } from '../components/TrashModal';
 
 export function Dashboard() {
   const queryClient = useQueryClient();
   const [newProjectName, setNewProjectName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
 
   const { data: projects, isLoading } = useQuery<Project[]>({
     queryKey: ['projects'],
@@ -47,16 +49,36 @@ export function Dashboard() {
           <h1 className="text-2xl font-bold tracking-tight text-text-primary">Workspaces</h1>
           <p className="text-text-secondary text-sm mt-1">Manage your data engineering projects.</p>
         </div>
-        <button 
-          onClick={() => setIsCreating(!isCreating)}
-          className="accent-button px-4 py-2 rounded-md flex items-center gap-2 text-sm"
-        >
-          <Plus size={16} />
-          New Project
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowTrash(true)}
+            className="glass-button px-4 py-2 rounded-md flex items-center gap-2 text-sm"
+          >
+            <Trash2 size={16} />
+            Trash
+          </button>
+          <button
+            onClick={() => setIsCreating(!isCreating)}
+            className="accent-button px-4 py-2 rounded-md flex items-center gap-2 text-sm"
+          >
+            <Plus size={16} />
+            New Project
+          </button>
+        </div>
       </div>
 
       <UsageWidget />
+
+      {showTrash && (
+        <TrashModal
+          title="Trashed Projects"
+          trashQueryKey={['projects', 'trash']}
+          trashUrl="/projects/trash"
+          restoreUrl={(id) => `/projects/${id}/restore`}
+          invalidateQueryKeys={[['projects']]}
+          onClose={() => setShowTrash(false)}
+        />
+      )}
 
       {isCreating && (
         <div className="mb-8 glass-panel p-5 rounded-xl border border-border-strong flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-200">

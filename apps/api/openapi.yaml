@@ -37,6 +37,7 @@ components:
         ownerId: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        deletedAt: { type: string, format: date-time, nullable: true, description: 'Set when soft-deleted; restorable until then.' }
     Pipeline:
       type: object
       properties:
@@ -63,6 +64,7 @@ components:
             onComplete: { type: boolean, description: 'Default false' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        deletedAt: { type: string, format: date-time, nullable: true, description: 'Set when soft-deleted; restorable until then.' }
     Execution:
       type: object
       properties:
@@ -280,6 +282,18 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Project' }
 
+  /projects/trash:
+    get:
+      summary: List the current user's soft-deleted projects, for recovery
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Project' }
+
   /projects/{projectId}:
     parameters:
       - { name: projectId, in: path, required: true, schema: { type: string } }
@@ -349,6 +363,21 @@ paths:
         '201':
           description: Created
           content: { application/json: { schema: { $ref: '#/components/schemas/Pipeline' } } }
+
+  /projects/{projectId}/pipelines/trash:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: List a project's soft-deleted pipelines, for recovery
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Pipeline' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /projects/{projectId}/pipelines/{pipelineId}:
     parameters:

@@ -48,6 +48,11 @@ export class PipelineService {
     return pipeline;
   }
 
+  async listTrashed(projectId: string, ownerId: string) {
+    await projectService.getById(projectId, ownerId);
+    return Pipeline.find({ projectId, deletedAt: { $ne: null } }).sort({ deletedAt: -1 }).limit(200);
+  }
+
   async restore(pipelineId: string, projectId: string, ownerId: string) {
     await projectService.getById(projectId, ownerId);
     const pipeline = await Pipeline.findOneAndUpdate(

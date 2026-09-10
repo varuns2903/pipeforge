@@ -8,6 +8,7 @@ const mapToDTO = (doc: any) => ({
   ownerId: doc.ownerId.toString(),
   createdAt: doc.createdAt.toISOString(),
   updatedAt: doc.updatedAt.toISOString(),
+  deletedAt: doc.deletedAt ? doc.deletedAt.toISOString() : null,
 });
 
 export class ProjectController {
@@ -53,6 +54,13 @@ export class ProjectController {
       if (err.message === 'Project not found') return res.status(404).json({ error: err.message });
       next(err);
     }
+  }
+
+  async listTrashed(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const projects = await projectService.listTrashed(req.user.id);
+      res.json(projects.map(mapToDTO));
+    } catch (err) { next(err); }
   }
 
   async restore(req: AuthRequest, res: Response, next: NextFunction) {

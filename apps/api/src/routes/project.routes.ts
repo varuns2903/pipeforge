@@ -25,6 +25,9 @@ projectRouter.use(requireAuth);
 // Project Routes
 projectRouter.post('/', nameValidation, validate, projectController.create);
 projectRouter.get('/', projectController.list);
+// Must be registered before '/:projectId' or express would try to look up a
+// project literally named "trash".
+projectRouter.get('/trash', projectController.listTrashed);
 projectRouter.get('/:projectId', projectController.get);
 projectRouter.put('/:projectId', nameValidation, validate, projectController.update);
 projectRouter.delete('/:projectId', projectController.delete);
@@ -33,6 +36,8 @@ projectRouter.post('/:projectId/restore', projectController.restore);
 // Pipeline Routes (nested)
 projectRouter.post('/:projectId/pipelines', nameValidation, validate, pipelineController.create);
 projectRouter.get('/:projectId/pipelines', pipelineController.list);
+// Same ordering concern as '/trash' above, one level down.
+projectRouter.get('/:projectId/pipelines/trash', pipelineController.listTrashed);
 projectRouter.get('/:projectId/pipelines/:pipelineId', pipelineController.get);
 projectRouter.get('/:projectId/pipelines/:pipelineId/validate', pipelineController.validate);
 projectRouter.post('/:projectId/pipelines/:pipelineId/run', pipelineController.run);

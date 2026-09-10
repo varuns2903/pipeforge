@@ -4,4 +4,5 @@ export interface Project {
   ownerId: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }

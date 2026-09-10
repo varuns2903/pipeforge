@@ -4,12 +4,14 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { Project, Pipeline } from '@pipeforge/shared';
 import { Workflow, Plus, Trash2, ArrowLeft, Settings2 } from 'lucide-react';
+import { TrashModal } from '../components/TrashModal';
 
 export function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const queryClient = useQueryClient();
   const [newPipelineName, setNewPipelineName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
 
   const { data: project, isLoading: isLoadingProject } = useQuery<Project>({
     queryKey: ['project', projectId],
@@ -67,10 +69,16 @@ export function ProjectDetail() {
       <div className="flex items-center justify-between mb-10">
         <h1 className="text-2xl font-bold tracking-tight text-text-primary">{project.name}</h1>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowTrash(true)}
+            className="glass-button px-3 py-2 rounded-md flex items-center gap-2 text-sm"
+          >
+            <Trash2 size={16} /> Trash
+          </button>
           <button className="glass-button px-3 py-2 rounded-md flex items-center gap-2 text-sm">
             <Settings2 size={16} /> Settings
           </button>
-          <button 
+          <button
             onClick={() => setIsCreating(!isCreating)}
             className="accent-button px-4 py-2 rounded-md flex items-center gap-2 text-sm"
           >
@@ -79,6 +87,17 @@ export function ProjectDetail() {
           </button>
         </div>
       </div>
+
+      {showTrash && (
+        <TrashModal
+          title="Trashed Pipelines"
+          trashQueryKey={['pipelines', projectId, 'trash']}
+          trashUrl={`/projects/${projectId}/pipelines/trash`}
+          restoreUrl={(id) => `/projects/${projectId}/pipelines/${id}/restore`}
+          invalidateQueryKeys={[['pipelines', projectId]]}
+          onClose={() => setShowTrash(false)}
+        />
+      )}
 
       {isCreating && (
         <div className="mb-8 glass-panel p-5 rounded-xl border border-border-strong flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-200">

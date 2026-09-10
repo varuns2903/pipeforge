@@ -23,6 +23,7 @@ const mapToDTO = (doc: any) => ({
   },
   createdAt: doc.createdAt.toISOString(),
   updatedAt: doc.updatedAt.toISOString(),
+  deletedAt: doc.deletedAt ? doc.deletedAt.toISOString() : null,
 });
 
 export class PipelineController {
@@ -39,6 +40,16 @@ export class PipelineController {
   async list(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const pipelines = await pipelineService.list((req.params.projectId as string), req.user.id);
+      res.json(pipelines.map(mapToDTO));
+    } catch (err: any) {
+      if (err.message === 'Project not found') return res.status(404).json({ error: err.message });
+      next(err);
+    }
+  }
+
+  async listTrashed(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const pipelines = await pipelineService.listTrashed((req.params.projectId as string), req.user.id);
       res.json(pipelines.map(mapToDTO));
     } catch (err: any) {
       if (err.message === 'Project not found') return res.status(404).json({ error: err.message });

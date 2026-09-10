@@ -19,4 +19,5 @@ export interface Pipeline {
   notifications?: PipelineNotifications;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
