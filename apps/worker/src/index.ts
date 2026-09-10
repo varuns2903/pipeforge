@@ -1,28 +1,21 @@
 import { Worker } from 'bullmq';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-import path from 'path';
 import Redis from 'ioredis';
 import { PipelineEngine, PipelineValidator } from '@pipeforge/pipeline-engine';
 import { executionSchema, pipelineSchema, createLogger, createMailer } from '@pipeforge/shared';
+import { env } from './config/env';
 import { resolveConnections } from './resolveConnections';
 import { isFinalAttempt } from './jobAttempts';
 import { shouldNotify } from './notificationGate';
 
-dotenv.config({ path: path.join(__dirname, '../../../.env') });
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pipeforge';
-const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
-const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6380', 10);
-const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
-const WEB_URL = process.env.WEB_URL || 'http://localhost:5173';
-if (!process.env.CONNECTION_ENCRYPTION_KEY) {
-  throw new Error('Missing required environment variable: CONNECTION_ENCRYPTION_KEY');
-}
-// Re-bound to a plain `string` const: TS's narrowing from the guard above
-// doesn't carry into functions defined later in this file that close over
-// process.env.CONNECTION_ENCRYPTION_KEY directly.
-const CONNECTION_ENCRYPTION_KEY: string = process.env.CONNECTION_ENCRYPTION_KEY;
+const {
+  MONGODB_URI,
+  REDIS_HOST,
+  REDIS_PORT,
+  WORKER_CONCURRENCY,
+  WEB_URL,
+  CONNECTION_ENCRYPTION_KEY,
+} = env;
 
 const redisPublisher = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
 
@@ -34,11 +27,11 @@ const Pipeline = mongoose.model('Pipeline', pipelineSchema);
 const UserContact = mongoose.model('User', new mongoose.Schema({ email: String, name: String }));
 const logger = createLogger('worker');
 const sendMail = createMailer({
-  smtpHost: process.env.SMTP_HOST,
-  smtpPort: parseInt(process.env.SMTP_PORT || '587', 10),
-  smtpUser: process.env.SMTP_USER,
-  smtpPass: process.env.SMTP_PASS,
-  mailFrom: process.env.MAIL_FROM || 'PipeForge <no-reply@pipeforge.local>',
+  smtpHost: env.SMTP_HOST,
+  smtpPort: env.SMTP_PORT,
+  smtpUser: env.SMTP_USER,
+  smtpPass: env.SMTP_PASS,
+  mailFrom: env.MAIL_FROM,
 }, logger);
 
 async function notifyOwner(pipeline: any, ownerId: string, executionId: string, status: 'COMPLETED' | 'FAILED', errorMessage?: string) {

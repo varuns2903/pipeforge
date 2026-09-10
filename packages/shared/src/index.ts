@@ -8,3 +8,4 @@ export * from './schemas/connection.schema.js';
 export * from './logger.js';
 export * from './crypto.js';
 export * from './mailer.js';
+export * from './env.js';

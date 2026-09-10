@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAuth, AuthRequest } from '../middleware/auth.middleware';
 import { File } from '../models/File';
-import { MAX_USER_STORAGE_MB } from '../config/env';
+import { MAX_USER_STORAGE_MB, MAX_FILE_SIZE_MB } from '../config/env';
 import fs from 'fs';
 
 const router = Router();
@@ -20,7 +20,6 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => cb(null, `${uuidv4()}-${sanitizeFilename(file.originalname)}`)
 });
 
-const MAX_FILE_SIZE_MB = Number(process.env.MAX_FILE_SIZE_MB) || 50;
 const MAX_USER_STORAGE_BYTES = MAX_USER_STORAGE_MB * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.csv', '.json']);
 

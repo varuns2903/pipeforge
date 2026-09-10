@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import { authController } from '../controllers/auth.controller';
 import { requireAuth } from '../middleware/auth.middleware';
+import { NODE_ENV } from '../config/env';
 
 export const authRouter = Router();
 
@@ -12,7 +13,7 @@ const authLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () => NODE_ENV === 'test',
   message: { error: 'Too many attempts, please try again later.' }
 });
 

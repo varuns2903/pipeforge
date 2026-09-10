@@ -3,48 +3,64 @@
 // sees values from .env rather than picking up defaults before dotenv has run.
 import dotenv from 'dotenv';
 import path from 'path';
+import { z } from 'zod';
+import { loadEnv } from '@pipeforge/shared';
 
 dotenv.config({ path: path.join(__dirname, '../../../../.env') });
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(
-      `Missing required environment variable: ${name}. Set it in .env — see .env.example.`
-    );
-  }
-  return value;
-}
+const schema = z.object({
+  // No insecure fallback for either secret — better to refuse to start than
+  // silently sign tokens or store credentials under a well-known key.
+  JWT_SECRET: z.string().min(16, 'must be at least 16 characters — used to sign auth tokens'),
+  CONNECTION_ENCRYPTION_KEY: z.string().min(16, 'must be at least 16 characters — used to encrypt stored connection credentials'),
+  JWT_EXPIRES_IN: z.string().default('7d'),
+  PORT: z.coerce.number().int().positive().default(3000),
+  MONGODB_URI: z.string().url().default('mongodb://localhost:27017/pipeforge'),
+  REDIS_HOST: z.string().min(1).default('localhost'),
+  REDIS_PORT: z.coerce.number().int().positive().default(6380),
+  WEB_URL: z.string().url().default('http://localhost:5173'),
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
-export const JWT_SECRET = required('JWT_SECRET');
-// Encrypts stored connection credentials (DB passwords, S3/API keys) —
-// see packages/shared/src/crypto.ts. No insecure fallback, same reasoning
-// as JWT_SECRET: better to refuse to start than silently store secrets
-// under a well-known key.
-export const CONNECTION_ENCRYPTION_KEY = required('CONNECTION_ENCRYPTION_KEY');
-export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
-export const PORT = process.env.PORT || 3000;
-export const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pipeforge';
-export const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
-export const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6380', 10);
-export const WEB_URL = process.env.WEB_URL || 'http://localhost:5173';
-export const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+  // SMTP is optional: when unset, the mailer logs emails instead of sending
+  // them (see services/mailer.service.ts) so verification/reset flows still
+  // work end-to-end in dev/test without real credentials.
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASS: z.string().min(1).optional(),
+  MAIL_FROM: z.string().min(1).default('PipeForge <no-reply@pipeforge.local>'),
+
+  // Per-user quotas — reasonable defaults, no plan tiers. Both configurable
+  // via env so they can be tuned without a code change as real usage comes in.
+  MAX_USER_STORAGE_MB: z.coerce.number().positive().default(500),
+  MAX_CONCURRENT_EXECUTIONS_PER_USER: z.coerce.number().int().positive().default(5),
+  MAX_FILE_SIZE_MB: z.coerce.number().positive().default(50),
+});
+
+const env = loadEnv(schema);
+
+export const JWT_SECRET = env.JWT_SECRET;
+export const CONNECTION_ENCRYPTION_KEY = env.CONNECTION_ENCRYPTION_KEY;
+export const JWT_EXPIRES_IN = env.JWT_EXPIRES_IN;
+export const PORT = env.PORT;
+export const MONGODB_URI = env.MONGODB_URI;
+export const REDIS_HOST = env.REDIS_HOST;
+export const REDIS_PORT = env.REDIS_PORT;
+export const WEB_URL = env.WEB_URL;
+export const NODE_ENV = env.NODE_ENV;
+export const IS_PRODUCTION = env.NODE_ENV === 'production';
 // Kept independent of JWT_EXPIRES_IN (a jsonwebtoken-format string like '7d')
 // to avoid pulling in a date-math dependency just for this; if you change
 // JWT_EXPIRES_IN, update this too so the cookie doesn't outlive the token
 // (harmless if it does — the token itself will just fail verification).
 export const AUTH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-// SMTP is optional: when unset, the mailer logs emails instead of sending
-// them (see services/mailer.service.ts) so verification/reset flows still
-// work end-to-end in dev/test without real credentials.
-export const SMTP_HOST = process.env.SMTP_HOST;
-export const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
-export const SMTP_USER = process.env.SMTP_USER;
-export const SMTP_PASS = process.env.SMTP_PASS;
-export const MAIL_FROM = process.env.MAIL_FROM || 'PipeForge <no-reply@pipeforge.local>';
+export const SMTP_HOST = env.SMTP_HOST;
+export const SMTP_PORT = env.SMTP_PORT;
+export const SMTP_USER = env.SMTP_USER;
+export const SMTP_PASS = env.SMTP_PASS;
+export const MAIL_FROM = env.MAIL_FROM;
 
-// Per-user quotas — reasonable defaults, no plan tiers. Both configurable via
-// env so they can be tuned without a code change as real usage comes in.
-export const MAX_USER_STORAGE_MB = parseFloat(process.env.MAX_USER_STORAGE_MB || '500');
-export const MAX_CONCURRENT_EXECUTIONS_PER_USER = parseInt(process.env.MAX_CONCURRENT_EXECUTIONS_PER_USER || '5', 10);
+export const MAX_USER_STORAGE_MB = env.MAX_USER_STORAGE_MB;
+export const MAX_CONCURRENT_EXECUTIONS_PER_USER = env.MAX_CONCURRENT_EXECUTIONS_PER_USER;
+export const MAX_FILE_SIZE_MB = env.MAX_FILE_SIZE_MB;
