@@ -137,21 +137,25 @@ export function Dashboard() {
                   </div>
                   <h3 className="text-base font-medium text-text-primary truncate">{project.name}</h3>
                 </div>
-                
-                {/* Delete button (prevent link navigation) */}
-                <button 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (window.confirm('Delete this project forever?')) {
-                      deleteProject.mutate(project.id);
-                    }
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 text-text-tertiary hover:text-status-error hover:bg-status-error/10 rounded transition-all"
-                >
-                  <Trash2 size={16} />
-                </button>
+
+                {/* Delete button (prevent link navigation) — project management stays owner-only */}
+                {project.myRole === 'owner' ? (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (window.confirm('Delete this project forever?')) {
+                        deleteProject.mutate(project.id);
+                      }
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 text-text-tertiary hover:text-status-error hover:bg-status-error/10 rounded transition-all"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-xs-mono bg-surface-3 text-text-secondary border border-border-subtle capitalize shrink-0">{project.myRole}</span>
+                )}
               </div>
-              
+
               <div className="text-xs-mono text-text-tertiary flex items-center justify-between">
                 <span>{project.id.slice(0, 8)}</span>
                 <span>Created {new Date(project.createdAt).toLocaleDateString()}</span>

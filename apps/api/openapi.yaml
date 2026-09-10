@@ -35,9 +35,17 @@ components:
         id: { type: string }
         name: { type: string }
         ownerId: { type: string }
+        myRole: { type: string, enum: [owner, editor, viewer], description: "The requesting user's access level on this project." }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         deletedAt: { type: string, format: date-time, nullable: true, description: 'Set when soft-deleted; restorable until then.' }
+    ProjectMember:
+      type: object
+      properties:
+        userId: { type: string }
+        email: { type: string, nullable: true }
+        name: { type: string, nullable: true }
+        role: { type: string, enum: [owner, editor, viewer] }
     Pipeline:
       type: object
       properties:
@@ -334,6 +342,62 @@ paths:
         '200':
           description: OK
           content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/members:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: List a project's members (owner plus invited editors/viewers)
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ProjectMember' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      summary: Invite an existing user to the project by email (owner-only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string }
+                role: { type: string, enum: [editor, viewer] }
+      responses:
+        '201':
+          description: Created
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ProjectMember' } } } }
+        '400': { description: Invalid email/role, no such user, or already a member }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{projectId}/members/{memberId}:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: memberId, in: path, required: true, schema: { type: string } }
+    put:
+      summary: Change a member's role (owner-only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties: { role: { type: string, enum: [editor, viewer] } }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ProjectMember' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Remove a member from the project (owner-only)
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ProjectMember' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /projects/{projectId}/pipelines:

@@ -141,8 +141,8 @@ export class PipelineController {
 
   async run(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const pipeline = await pipelineService.getById((req.params.pipelineId as string), (req.params.projectId as string), req.user.id);
-      
+      const pipeline = await pipelineService.getById((req.params.pipelineId as string), (req.params.projectId as string), req.user.id, 'editor');
+
       const validator = new PipelineValidator();
       const validation = validator.validate(pipeline);
       if (!validation.isValid) {

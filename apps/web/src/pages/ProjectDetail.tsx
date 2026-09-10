@@ -3,15 +3,19 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { Project, Pipeline } from '@pipeforge/shared';
-import { Workflow, Plus, Trash2, ArrowLeft, Settings2 } from 'lucide-react';
+import { Workflow, Plus, Trash2, ArrowLeft, Settings2, Users } from 'lucide-react';
 import { TrashModal } from '../components/TrashModal';
+import { MembersModal } from '../components/MembersModal';
+import { useAuthStore } from '../store/authStore';
 
 export function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const queryClient = useQueryClient();
+  const currentUser = useAuthStore((s) => s.user);
   const [newPipelineName, setNewPipelineName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
 
   const { data: project, isLoading: isLoadingProject } = useQuery<Project>({
     queryKey: ['project', projectId],
@@ -67,24 +71,39 @@ export function ProjectDetail() {
         </Link>
       </div>
       <div className="flex items-center justify-between mb-10">
-        <h1 className="text-2xl font-bold tracking-tight text-text-primary">{project.name}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-text-primary">{project.name}</h1>
+          {project.myRole !== 'owner' && (
+            <span className="px-2 py-0.5 rounded text-xs-mono bg-surface-3 text-text-secondary border border-border-subtle capitalize">{project.myRole}</span>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowTrash(true)}
+            onClick={() => setShowMembers(true)}
             className="glass-button px-3 py-2 rounded-md flex items-center gap-2 text-sm"
           >
-            <Trash2 size={16} /> Trash
+            <Users size={16} /> Members
           </button>
+          {project.myRole === 'owner' && (
+            <button
+              onClick={() => setShowTrash(true)}
+              className="glass-button px-3 py-2 rounded-md flex items-center gap-2 text-sm"
+            >
+              <Trash2 size={16} /> Trash
+            </button>
+          )}
           <button className="glass-button px-3 py-2 rounded-md flex items-center gap-2 text-sm">
             <Settings2 size={16} /> Settings
           </button>
-          <button
-            onClick={() => setIsCreating(!isCreating)}
-            className="accent-button px-4 py-2 rounded-md flex items-center gap-2 text-sm"
-          >
-            <Plus size={16} />
-            New Pipeline
-          </button>
+          {project.myRole !== 'viewer' && (
+            <button
+              onClick={() => setIsCreating(!isCreating)}
+              className="accent-button px-4 py-2 rounded-md flex items-center gap-2 text-sm"
+            >
+              <Plus size={16} />
+              New Pipeline
+            </button>
+          )}
         </div>
       </div>
 
@@ -96,6 +115,15 @@ export function ProjectDetail() {
           restoreUrl={(id) => `/projects/${projectId}/pipelines/${id}/restore`}
           invalidateQueryKeys={[['pipelines', projectId]]}
           onClose={() => setShowTrash(false)}
+        />
+      )}
+
+      {showMembers && currentUser && (
+        <MembersModal
+          projectId={projectId!}
+          isOwner={project.myRole === 'owner'}
+          currentUserId={currentUser.id}
+          onClose={() => setShowMembers(false)}
         />
       )}
 
@@ -160,17 +188,19 @@ export function ProjectDetail() {
                     <h3 className="text-base font-medium text-text-primary truncate">{pipeline.name}</h3>
                   </div>
                   
-                  <button 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (window.confirm('Delete this pipeline?')) {
-                        deletePipeline.mutate(pipeline.id);
-                      }
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 text-text-tertiary hover:text-status-error hover:bg-status-error/10 rounded transition-all"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {project.myRole !== 'viewer' && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (window.confirm('Delete this pipeline?')) {
+                          deletePipeline.mutate(pipeline.id);
+                        }
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 text-text-tertiary hover:text-status-error hover:bg-status-error/10 rounded transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
                 
                 <div className="flex gap-2 mb-2">

@@ -33,6 +33,12 @@ projectRouter.put('/:projectId', nameValidation, validate, projectController.upd
 projectRouter.delete('/:projectId', projectController.delete);
 projectRouter.post('/:projectId/restore', projectController.restore);
 
+// Member Routes (owner-only to mutate; any member can list)
+projectRouter.get('/:projectId/members', projectController.listMembers);
+projectRouter.post('/:projectId/members', projectController.addMember);
+projectRouter.put('/:projectId/members/:memberId', projectController.updateMemberRole);
+projectRouter.delete('/:projectId/members/:memberId', projectController.removeMember);
+
 // Pipeline Routes (nested)
 projectRouter.post('/:projectId/pipelines', nameValidation, validate, pipelineController.create);
 projectRouter.get('/:projectId/pipelines', pipelineController.list);

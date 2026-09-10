@@ -50,7 +50,7 @@ export const executionController = {
     try {
       const { projectId, pipelineId, executionId } = req.params;
 
-      const pipeline = await pipelineService.getById(pipelineId as string, projectId as string, req.user.id);
+      const pipeline = await pipelineService.getById(pipelineId as string, projectId as string, req.user.id, 'editor');
 
       const original = await Execution.findOne({ _id: executionId, pipelineId });
       if (!original) return res.status(404).json({ error: 'Execution not found' });

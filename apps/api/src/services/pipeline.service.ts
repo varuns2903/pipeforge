@@ -1,32 +1,32 @@
 import { CronExpressionParser } from 'cron-parser';
 import { Pipeline } from '../models/Pipeline';
-import { projectService } from './project.service';
+import { projectService, ProjectRole } from './project.service';
 import { queueService } from './queue.service';
 
 export class PipelineService {
   async create(name: string, projectId: string, ownerId: string) {
-    await projectService.getById(projectId, ownerId); // verify ownership
+    await projectService.getById(projectId, ownerId, 'editor');
     const pipeline = new Pipeline({ name, projectId });
     await pipeline.save();
     return pipeline;
   }
 
   async list(projectId: string, ownerId: string) {
-    await projectService.getById(projectId, ownerId);
+    await projectService.getById(projectId, ownerId, 'viewer');
     // Safety cap against unbounded scans; real cursor-based pagination is a
     // separate, larger change (needs a frontend contract change too).
     return Pipeline.find({ projectId, deletedAt: null }).sort({ updatedAt: -1 }).limit(200);
   }
 
-  async getById(pipelineId: string, projectId: string, ownerId: string) {
-    await projectService.getById(projectId, ownerId);
+  async getById(pipelineId: string, projectId: string, ownerId: string, minRole: ProjectRole = 'viewer') {
+    await projectService.getById(projectId, ownerId, minRole);
     const pipeline = await Pipeline.findOne({ _id: pipelineId, projectId, deletedAt: null });
     if (!pipeline) throw new Error('Pipeline not found');
     return pipeline;
   }
 
   async update(pipelineId: string, projectId: string, ownerId: string, data: { name?: string, nodes?: any[], edges?: any[], notifications?: { onFailure?: boolean, onComplete?: boolean } }) {
-    await projectService.getById(projectId, ownerId);
+    await projectService.getById(projectId, ownerId, 'editor');
     const pipeline = await Pipeline.findOneAndUpdate(
       { _id: pipelineId, projectId, deletedAt: null },
       data,
@@ -39,7 +39,7 @@ export class PipelineService {
   // Soft delete: keeps the pipeline (and its execution history) around for
   // recovery instead of destroying it outright.
   async delete(pipelineId: string, projectId: string, ownerId: string) {
-    const pipeline = await this.getById(pipelineId, projectId, ownerId);
+    const pipeline = await this.getById(pipelineId, projectId, ownerId, 'editor');
     if (pipeline.schedule?.enabled) {
       await queueService.unscheduleRecurring(pipelineId);
     }
@@ -49,12 +49,12 @@ export class PipelineService {
   }
 
   async listTrashed(projectId: string, ownerId: string) {
-    await projectService.getById(projectId, ownerId);
+    await projectService.getById(projectId, ownerId, 'viewer');
     return Pipeline.find({ projectId, deletedAt: { $ne: null } }).sort({ deletedAt: -1 }).limit(200);
   }
 
   async restore(pipelineId: string, projectId: string, ownerId: string) {
-    await projectService.getById(projectId, ownerId);
+    await projectService.getById(projectId, ownerId, 'editor');
     const pipeline = await Pipeline.findOneAndUpdate(
       { _id: pipelineId, projectId, deletedAt: { $ne: null } },
       { deletedAt: null },
@@ -65,7 +65,7 @@ export class PipelineService {
   }
 
   async setSchedule(pipelineId: string, projectId: string, ownerId: string, cronExpression: string, timezone?: string) {
-    const pipeline = await this.getById(pipelineId, projectId, ownerId);
+    const pipeline = await this.getById(pipelineId, projectId, ownerId, 'editor');
 
     try {
       CronExpressionParser.parse(cronExpression, timezone ? { tz: timezone } : undefined);
@@ -84,7 +84,7 @@ export class PipelineService {
   }
 
   async clearSchedule(pipelineId: string, projectId: string, ownerId: string) {
-    const pipeline = await this.getById(pipelineId, projectId, ownerId);
+    const pipeline = await this.getById(pipelineId, projectId, ownerId, 'editor');
 
     if (pipeline.schedule?.enabled) {
       await queueService.unscheduleRecurring(pipelineId);
