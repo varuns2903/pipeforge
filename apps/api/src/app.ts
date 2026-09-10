@@ -14,6 +14,7 @@ import { authRouter } from './routes/auth.routes';
 import { projectRouter } from './routes/project.routes';
 import { fileRouter } from './routes/file.routes';
 import { connectionRouter } from './routes/connection.routes';
+import { usageRouter } from './routes/usage.routes';
 
 export { logger };
 
@@ -40,6 +41,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/projects', projectRouter);
 app.use('/api/files', fileRouter);
 app.use('/api/connections', connectionRouter);
+app.use('/api/usage', usageRouter);
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   req.log.error({ err }, 'Unhandled error');

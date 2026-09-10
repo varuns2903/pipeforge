@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { Project } from '@pipeforge/shared';
 import { Folder, Plus, Trash2 } from 'lucide-react';
+import { UsageWidget } from '../components/UsageWidget';
 
 export function Dashboard() {
   const queryClient = useQueryClient();
@@ -54,6 +55,8 @@ export function Dashboard() {
           New Project
         </button>
       </div>
+
+      <UsageWidget />
 
       {isCreating && (
         <div className="mb-8 glass-panel p-5 rounded-xl border border-border-strong flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-200">

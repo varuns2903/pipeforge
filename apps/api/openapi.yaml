@@ -577,3 +577,25 @@ paths:
       responses:
         '204': { description: Deleted }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /usage:
+    get:
+      summary: Get the current user's quota usage (storage and concurrent executions)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  storage:
+                    type: object
+                    properties:
+                      usedBytes: { type: integer }
+                      limitBytes: { type: integer, description: MAX_USER_STORAGE_MB in bytes }
+                  executions:
+                    type: object
+                    properties:
+                      active: { type: integer, description: 'Count of PENDING/RUNNING executions' }
+                      limit: { type: integer, description: MAX_CONCURRENT_EXECUTIONS_PER_USER }
