@@ -10,7 +10,7 @@ interface Connection {
   type: 'postgres' | 'mysql' | 's3' | 'api';
 }
 
-export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { selectedNode: any, setNodes: any, setEdges: any, projectId: string }) {
+export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBeforeDelete }: { selectedNode: any, setNodes: any, setEdges: any, projectId: string, onBeforeDelete?: () => void }) {
   const [config, setConfig] = useState<any>({});
   const [uploading, setUploading] = useState(false);
 
@@ -73,7 +73,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { s
           {selectedNode.data.label}
         </div>
         <button
-          onClick={() => { setNodes((nds: any[]) => nds.filter((n) => n.id !== selectedNode.id)); setEdges((eds: any[]) => eds.filter((e) => e.source !== selectedNode.id && e.target !== selectedNode.id)); }}
+          onClick={() => { onBeforeDelete?.(); setNodes((nds: any[]) => nds.filter((n) => n.id !== selectedNode.id)); setEdges((eds: any[]) => eds.filter((e) => e.source !== selectedNode.id && e.target !== selectedNode.id)); }}
           className="text-text-tertiary hover:text-status-error transition-colors"
           title="Delete Node"
         >

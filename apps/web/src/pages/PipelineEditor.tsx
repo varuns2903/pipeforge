@@ -15,7 +15,7 @@ import type { Connection, Edge, Node } from '@xyflow/react';
 import { useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { api } from '../lib/api';
-import { ArrowLeft, Save, Play, Check, ShieldCheck, AlertTriangle, Clock, Calendar, Bell, Webhook as WebhookIcon } from 'lucide-react';
+import { ArrowLeft, Save, Play, Check, ShieldCheck, AlertTriangle, Clock, Calendar, Bell, Webhook as WebhookIcon, Undo2, Redo2 } from 'lucide-react';
 
 import { CustomNode } from '../components/editor/CustomNode';
 import { NodePalette } from '../components/editor/NodePalette';
@@ -28,6 +28,7 @@ import { WebhookModal } from '../components/editor/WebhookModal';
 import { DirectionContext } from '../components/editor/DirectionContext';
 import { LayoutList, LayoutPanelLeft } from 'lucide-react';
 import { getLayoutedElements } from '../components/editor/layout';
+import { useHistory } from '../components/editor/useHistory';
 
 const nodeTypes = {
   dataNode: CustomNode,
@@ -50,6 +51,7 @@ function EditorCanvas() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isWebhookOpen, setIsWebhookOpen] = useState(false);
   const [direction, setDirection] = useState<'TB' | 'LR'>('TB');
+  const { pushHistory, undo, redo, resetHistory, canUndo, canRedo } = useHistory(nodes, edges, setNodes, setEdges);
 
   const { data: pipeline, isLoading } = useQuery({
     queryKey: ['pipeline', pipelineId],
@@ -64,12 +66,14 @@ function EditorCanvas() {
     if (pipeline) {
       setNodes(pipeline.nodes || []);
       setEdges(pipeline.edges || []);
+      resetHistory();
     }
-  }, [pipeline, setNodes, setEdges]);
+  }, [pipeline, setNodes, setEdges, resetHistory]);
 
   const onConnect = useCallback((params: Connection | Edge) => {
+    pushHistory();
     setEdges((eds) => addEdge({ ...params, animated: true } as any, eds));
-  }, [setEdges]);
+  }, [setEdges, pushHistory]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -100,10 +104,52 @@ function EditorCanvas() {
         },
       };
 
+      pushHistory();
       setNodes((nds) => nds.concat(newNode));
     },
-    [setNodes]
+    [setNodes, pushHistory]
   );
+
+  // React Flow calls these for the keyboard-driven delete path (Delete/
+  // Backspace with a node or edge selected) — the config panel's own trash
+  // button goes through a separate direct setNodes/setEdges call and pushes
+  // its own history entry (see ConfigPanel's onDelete prop below).
+  const onNodesDelete = useCallback(() => {
+    pushHistory();
+  }, [pushHistory]);
+
+  const onEdgesDelete = useCallback(() => {
+    pushHistory();
+  }, [pushHistory]);
+
+  const onNodeDragStart = useCallback(() => {
+    pushHistory();
+  }, [pushHistory]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      // Don't hijack Ctrl+Z/Y inside a text input/textarea — let native
+      // text-field undo work there instead of undoing the whole canvas.
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (isTyping) return;
+
+      const isMod = e.ctrlKey || e.metaKey;
+      if (!isMod) return;
+
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+        setSelectedNode(null);
+      } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+        e.preventDefault();
+        redo();
+        setSelectedNode(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -147,8 +193,9 @@ function EditorCanvas() {
     const handleLayoutToggle = () => {
     const newDirection = direction === 'TB' ? 'LR' : 'TB';
     setDirection(newDirection);
-    
+
     // Auto layout with new direction
+    pushHistory();
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges, newDirection);
     setNodes(layoutedNodes as any);
     setEdges(layoutedEdges as any);
@@ -181,6 +228,24 @@ function EditorCanvas() {
         </div>
         <div className="flex items-center gap-4">
           {lastSaved && <span className="text-xs text-text-tertiary flex items-center gap-1"><Check size={12} /> Saved</span>}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => { undo(); setSelectedNode(null); }}
+              disabled={!canUndo}
+              title="Undo (Ctrl+Z)"
+              className="glass-button p-1.5 rounded text-text-secondary hover:text-text-primary disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <Undo2 size={14} />
+            </button>
+            <button
+              onClick={() => { redo(); setSelectedNode(null); }}
+              disabled={!canRedo}
+              title="Redo (Ctrl+Shift+Z)"
+              className="glass-button p-1.5 rounded text-text-secondary hover:text-text-primary disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <Redo2 size={14} />
+            </button>
+          </div>
                     <button onClick={handleLayoutToggle} className="glass-button px-3 py-1.5 rounded flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary">
             {direction === 'TB' ? <LayoutPanelLeft size={14} /> : <LayoutList size={14} />}
             {direction === 'TB' ? 'Horizontal' : 'Vertical'}
@@ -257,6 +322,9 @@ function EditorCanvas() {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onNodesDelete={onNodesDelete}
+            onEdgesDelete={onEdgesDelete}
+            onNodeDragStart={onNodeDragStart}
             onConnect={onConnect}
             onDrop={onDrop}
             onDragOver={onDragOver}
@@ -275,7 +343,7 @@ function EditorCanvas() {
             />
           </ReactFlow>
         </div>
-        <ConfigPanel selectedNode={selectedNode} setNodes={setNodes} setEdges={setEdges} projectId={projectId!} />
+        <ConfigPanel selectedNode={selectedNode} setNodes={setNodes} setEdges={setEdges} projectId={projectId!} onBeforeDelete={pushHistory} />
         {isDrawerOpen && <ExecutionDrawer pipelineId={pipelineId!} onClose={() => setIsDrawerOpen(false)} />}
         {isHistoryOpen && <HistoryModal onClose={() => setIsHistoryOpen(false)} />}
         {isScheduleOpen && (
