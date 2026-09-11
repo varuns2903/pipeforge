@@ -1,0 +1,66 @@
+groups:
+  - name: pipeforge
+    rules:
+      - alert: ApiDown
+        expr: up{job="pipeforge-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PipeForge API is unreachable"
+          description: "Prometheus has failed to scrape the api's /metrics endpoint for 1 minute."
+
+      - alert: WorkerDown
+        expr: up{job="pipeforge-worker"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PipeForge worker is unreachable"
+          description: "Prometheus has failed to scrape the worker's /metrics endpoint for 1 minute. Queued pipeline executions will not be processed."
+
+      - alert: HighHttpErrorRate
+        expr: >
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API 5xx error rate above 5%"
+          description: "More than 5% of HTTP requests over the last 5 minutes returned a 5xx status."
+
+      - alert: SlowHttpRequestsP95
+        expr: >
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+          > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API p95 request latency above 2s"
+          description: "The 95th percentile HTTP request duration has been above 2 seconds for 5 minutes."
+
+      - alert: PipelineExecutionFailureRateHigh
+        expr: >
+          sum(rate(pipeline_executions_total{job="pipeforge-worker", status="FAILED"}[15m]))
+          /
+          sum(rate(pipeline_executions_total{job="pipeforge-worker"}[15m]))
+          > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 20% of pipeline executions are failing"
+          description: "Over the last 15 minutes, more than 20% of processed pipeline executions ended in FAILED status."
+
+      - alert: WorkerEventLoopLagHigh
+        expr: nodejs_eventloop_lag_seconds{job="pipeforge-worker"} > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker event loop lag is high"
+          description: "The worker's Node.js event loop lag has been above 500ms for 5 minutes, meaning execution processing is falling behind."

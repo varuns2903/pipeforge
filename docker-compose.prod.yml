@@ -70,7 +70,44 @@ services:
       - '5173:80'
     restart: unless-stopped
 
+  # Scrapes api's and worker's /metrics endpoints (see apps/*/src/metrics.ts)
+  # and evaluates monitoring/prometheus/alert_rules.yml. Alerts are visible
+  # under Prometheus's own Alerts page; wiring a notification channel
+  # (Alertmanager, Slack, PagerDuty, etc.) is a deploy-specific choice left
+  # to whoever operates this stack.
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - api
+      - worker
+    ports:
+      - '9090:9090'
+    restart: unless-stopped
+
+  # Pre-provisioned with the Prometheus datasource and the "PipeForge
+  # Overview" dashboard (monitoring/grafana/) — no manual setup needed after
+  # first boot. Default login is admin/admin; change GRAFANA_ADMIN_PASSWORD.
+  grafana:
+    image: grafana/grafana:11.3.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - '3001:3000'
+    restart: unless-stopped
+
 volumes:
   mongodb_data:
   redis_data:
   uploads_data:
+  prometheus_data:
+  grafana_data:
