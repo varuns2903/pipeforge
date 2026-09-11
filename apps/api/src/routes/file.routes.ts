@@ -75,4 +75,31 @@ router.post('/upload', requireAuth, (req: AuthRequest, res) => {
   });
 });
 
+router.get('/', requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const files = await File.find({ ownerId: req.user.id }).sort({ createdAt: -1 }).limit(200);
+    res.json(files.map(f => ({
+      id: f._id.toString(),
+      filePath: f.filePath,
+      originalName: f.originalName,
+      size: f.size,
+      createdAt: f.createdAt.toISOString(),
+    })));
+  } catch (err) { next(err); }
+});
+
+router.delete('/:fileId', requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const file = await File.findOneAndDelete({ _id: req.params.fileId, ownerId: req.user.id });
+    if (!file) return res.status(404).json({ error: 'File not found' });
+
+    // path.basename strips any directory components a malformed filePath
+    // might contain, so this can never unlink outside uploadDir.
+    const diskPath = path.join(uploadDir, path.basename(file.filePath));
+    fs.unlink(diskPath, () => {}); // best-effort — the File record is the source of truth for quota either way
+
+    res.status(204).send();
+  } catch (err) { next(err); }
+});
+
 export const fileRouter = router;

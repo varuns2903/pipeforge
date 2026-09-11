@@ -15,6 +15,7 @@ import { projectRouter } from './routes/project.routes';
 import { fileRouter } from './routes/file.routes';
 import { connectionRouter } from './routes/connection.routes';
 import { usageRouter } from './routes/usage.routes';
+import { myExecutionsRouter } from './routes/myExecutions.routes';
 import { billingRouter } from './routes/billing.routes';
 import { billingController } from './controllers/billing.controller';
 import { registry, httpRequestDuration, httpRequestsTotal } from './metrics';
@@ -76,6 +77,7 @@ app.use('/api/projects', projectRouter);
 app.use('/api/files', fileRouter);
 app.use('/api/connections', connectionRouter);
 app.use('/api/usage', usageRouter);
+app.use('/api/executions', myExecutionsRouter);
 app.use('/api/billing', billingRouter);
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

@@ -97,6 +97,29 @@ components:
         name: { type: string }
         maxStorageMB: { type: number }
         maxConcurrentExecutions: { type: integer }
+    FileSummary:
+      type: object
+      properties:
+        id: { type: string }
+        filePath: { type: string }
+        originalName: { type: string }
+        size: { type: integer }
+        createdAt: { type: string, format: date-time }
+    ExecutionSummary:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [PENDING, RUNNING, COMPLETED, FAILED] }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        error: { type: string, nullable: true }
+        pipeline:
+          type: object
+          properties: { id: { type: string, nullable: true }, name: { type: string, nullable: true } }
+        project:
+          type: object
+          properties: { id: { type: string, nullable: true }, name: { type: string, nullable: true } }
     Execution:
       type: object
       properties:
@@ -722,6 +745,40 @@ paths:
                   size: { type: integer }
         '400': { description: 'No file, wrong type, or over the per-file size limit' }
         '413': { description: 'Would exceed the user''s total storage quota (MAX_USER_STORAGE_MB)' }
+
+  /files:
+    get:
+      summary: List the current user's uploaded datasets
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FileSummary' }
+
+  /files/{fileId}:
+    parameters:
+      - { name: fileId, in: path, required: true, schema: { type: string } }
+    delete:
+      summary: Delete an uploaded dataset (frees its storage quota)
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /executions:
+    get:
+      summary: List every execution the current user has personally triggered, across all their projects
+      description: Does not include executions run by teammates in a shared project — see the activity log for that.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ExecutionSummary' }
 
   /connections:
     get:
