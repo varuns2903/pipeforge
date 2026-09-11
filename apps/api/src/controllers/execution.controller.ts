@@ -83,6 +83,7 @@ export const executionController = {
       // nodes/edges as the thing that actually gets re-executed.
       await queueService.queueExecution(retry._id.toString(), {
         _id: pipeline._id,
+        projectId: pipeline.projectId,
         name: pipeline.name,
         notifications: pipeline.notifications,
         webhook: pipeline.webhook,

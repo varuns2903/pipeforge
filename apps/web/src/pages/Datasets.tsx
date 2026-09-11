@@ -8,6 +8,7 @@ interface FileSummary {
   originalName: string;
   size: number;
   createdAt: string;
+  project: { id: string | null; name: string | null };
 }
 
 function formatBytes(bytes: number): string {
@@ -27,15 +28,16 @@ export function Datasets() {
   });
 
   const deleteFile = useMutation({
-    mutationFn: async (id: string) => { await api.delete(`/files/${id}`); },
+    mutationFn: async (file: FileSummary) => { await api.delete(`/projects/${file.project.id}/files/${file.id}`); },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-files'] }),
+    onError: (err: any) => alert(err.response?.data?.error || 'Failed to delete file (you may only have view access to its project)'),
   });
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <div className="mb-10">
         <h1 className="text-2xl font-bold tracking-tight text-text-primary">Datasets</h1>
-        <p className="text-text-secondary text-sm mt-1">Files you've uploaded for use as pipeline sources (csv-input / json-input).</p>
+        <p className="text-text-secondary text-sm mt-1">Files uploaded across every project you belong to, for use as pipeline sources (csv-input / json-input).</p>
       </div>
 
       {isLoading ? (
@@ -63,12 +65,14 @@ export function Datasets() {
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-text-primary truncate">{file.originalName}</div>
-                  <div className="text-xs text-text-tertiary">Uploaded {new Date(file.createdAt).toLocaleDateString()}</div>
+                  <div className="text-xs text-text-tertiary">
+                    {file.project.name || 'Deleted project'} &middot; Uploaded {new Date(file.createdAt).toLocaleDateString()}
+                  </div>
                 </div>
               </div>
               <div className="shrink-0 text-xs-mono text-text-secondary">{formatBytes(file.size)}</div>
               <button
-                onClick={() => { if (window.confirm(`Delete "${file.originalName}"? Pipelines referencing it will fail to run.`)) deleteFile.mutate(file.id); }}
+                onClick={() => { if (window.confirm(`Delete "${file.originalName}"? Pipelines referencing it will fail to run.`)) deleteFile.mutate(file); }}
                 disabled={deleteFile.isPending}
                 className="shrink-0 p-1.5 text-text-tertiary hover:text-status-error hover:bg-status-error/10 rounded transition-all disabled:opacity-50"
               >

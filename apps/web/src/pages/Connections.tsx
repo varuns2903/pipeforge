@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
-import { Plug, Plus, Trash2, Database, Cloud, Globe } from 'lucide-react';
+import { Plug, Plus, Trash2, Database, Cloud, Globe, ArrowLeft } from 'lucide-react';
+import type { Project } from '@pipeforge/shared';
 
 interface Connection {
   id: string;
@@ -22,15 +24,23 @@ const EMPTY_FORM = {
 };
 
 export function Connections() {
+  const { projectId } = useParams<{ projectId: string }>();
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
 
-  const { data: connections, isLoading } = useQuery<Connection[]>({
-    queryKey: ['connections'],
-    queryFn: async () => (await api.get('/connections')).data,
+  const { data: project } = useQuery<Project>({
+    queryKey: ['project', projectId],
+    queryFn: async () => (await api.get(`/projects/${projectId}`)).data,
   });
+
+  const { data: connections, isLoading } = useQuery<Connection[]>({
+    queryKey: ['connections', projectId],
+    queryFn: async () => (await api.get(`/projects/${projectId}/connections`)).data,
+  });
+
+  const canEdit = project?.myRole !== 'viewer';
 
   const createConnection = useMutation({
     mutationFn: async () => {
@@ -46,10 +56,10 @@ export function Connections() {
         config = { baseUrl: form.baseUrl, authType: form.authType, headerName: form.headerName || undefined };
         secret = { token: form.token || undefined };
       }
-      await api.post('/connections', { name: form.name, type: form.type, config, secret });
+      await api.post(`/projects/${projectId}/connections`, { name: form.name, type: form.type, config, secret });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['connections'] });
+      queryClient.invalidateQueries({ queryKey: ['connections', projectId] });
       setForm(EMPTY_FORM);
       setIsCreating(false);
       setError('');
@@ -58,20 +68,27 @@ export function Connections() {
   });
 
   const deleteConnection = useMutation({
-    mutationFn: async (id: string) => { await api.delete(`/connections/${id}`); },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['connections'] }),
+    mutationFn: async (id: string) => { await api.delete(`/projects/${projectId}/connections/${id}`); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['connections', projectId] }),
   });
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
+      <div className="flex items-center gap-3 mb-2">
+        <Link to={`/projects/${projectId}`} className="text-text-tertiary hover:text-text-primary transition-colors flex items-center gap-1 text-sm">
+          <ArrowLeft size={16} /> {project?.name || 'Project'}
+        </Link>
+      </div>
       <div className="flex items-center justify-between mb-10">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-text-primary">Connections</h1>
-          <p className="text-text-secondary text-sm mt-1">Saved credentials for Postgres, S3, and API data sources. Credentials are encrypted at rest and never shown again after creation.</p>
+          <p className="text-text-secondary text-sm mt-1">Saved credentials for Postgres, S3, and API data sources, shared with every member of this project. Credentials are encrypted at rest and never shown again after creation.</p>
         </div>
-        <button onClick={() => setIsCreating(!isCreating)} className="accent-button px-4 py-2 rounded-md flex items-center gap-2 text-sm">
-          <Plus size={16} /> New Connection
-        </button>
+        {canEdit && (
+          <button onClick={() => setIsCreating(!isCreating)} className="accent-button px-4 py-2 rounded-md flex items-center gap-2 text-sm shrink-0">
+            <Plus size={16} /> New Connection
+          </button>
+        )}
       </div>
 
       {isCreating && (
@@ -146,7 +163,7 @@ export function Connections() {
         <div className="flex flex-col items-center justify-center py-20 px-4 border border-dashed border-border-strong rounded-xl bg-surface-1/50">
           <Plug className="text-text-tertiary mb-4" size={24} />
           <h3 className="text-lg font-medium text-text-primary">No connections yet</h3>
-          <p className="text-text-secondary text-sm mt-1 max-w-sm text-center">Add a Postgres, S3, or API connection to use in pipeline connector nodes.</p>
+          <p className="text-text-secondary text-sm mt-1 max-w-sm text-center">Add a Postgres, S3, or API connection to use in this project's pipeline connector nodes.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -167,10 +184,12 @@ export function Connections() {
                     </div>
                   </div>
                 </div>
-                <button onClick={() => { if (window.confirm(`Delete connection "${conn.name}"?`)) deleteConnection.mutate(conn.id); }}
-                  className="p-1.5 text-text-tertiary hover:text-status-error hover:bg-status-error/10 rounded transition-all">
-                  <Trash2 size={16} />
-                </button>
+                {canEdit && (
+                  <button onClick={() => { if (window.confirm(`Delete connection "${conn.name}"?`)) deleteConnection.mutate(conn.id); }}
+                    className="p-1.5 text-text-tertiary hover:text-status-error hover:bg-status-error/10 rounded transition-all">
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             );
           })}

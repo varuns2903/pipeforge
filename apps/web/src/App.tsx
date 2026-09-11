@@ -39,7 +39,7 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/projects/:projectId" element={<ProjectDetail />} />
-              <Route path="/connections" element={<Connections />} />
+              <Route path="/projects/:projectId/connections" element={<Connections />} />
               <Route path="/billing" element={<Billing />} />
               <Route path="/executions" element={<Executions />} />
               <Route path="/datasets" element={<Datasets />} />

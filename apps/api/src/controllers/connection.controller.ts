@@ -6,6 +6,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 // this is the one place a leak would expose every stored credential.
 const mapToDTO = (doc: any) => ({
   id: doc._id.toString(),
+  projectId: doc.projectId.toString(),
   name: doc.name,
   type: doc.type,
   config: doc.config,
@@ -20,9 +21,12 @@ export class ConnectionController {
       if (!name || !type) {
         return res.status(400).json({ error: 'name and type are required' });
       }
-      const connection = await connectionService.create(req.user.id, name, type, config || {}, secret || {});
+      const connection = await connectionService.create(
+        req.params.projectId as string, req.user.id, name, type, config || {}, secret || {}
+      );
       res.status(201).json(mapToDTO(connection));
     } catch (err: any) {
+      if (err.message === 'Project not found') return res.status(404).json({ error: err.message });
       if (err.message.includes('require') || err.message.startsWith('Unknown connection type')) {
         return res.status(400).json({ error: err.message });
       }
@@ -32,27 +36,32 @@ export class ConnectionController {
 
   async list(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const connections = await connectionService.list(req.user.id);
+      const connections = await connectionService.list(req.params.projectId as string, req.user.id);
       res.json(connections.map(mapToDTO));
-    } catch (err) { next(err); }
+    } catch (err: any) {
+      if (err.message === 'Project not found') return res.status(404).json({ error: err.message });
+      next(err);
+    }
   }
 
   async get(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const connection = await connectionService.getById(req.params.connectionId as string, req.user.id);
+      const connection = await connectionService.getById(
+        req.params.connectionId as string, req.params.projectId as string, req.user.id
+      );
       res.json(mapToDTO(connection));
     } catch (err: any) {
-      if (err.message === 'Connection not found') return res.status(404).json({ error: err.message });
+      if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
       next(err);
     }
   }
 
   async delete(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await connectionService.delete(req.params.connectionId as string, req.user.id);
+      await connectionService.delete(req.params.connectionId as string, req.params.projectId as string, req.user.id);
       res.status(204).send();
     } catch (err: any) {
-      if (err.message === 'Connection not found') return res.status(404).json({ error: err.message });
+      if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
       next(err);
     }
   }

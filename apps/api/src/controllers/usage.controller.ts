@@ -9,14 +9,16 @@ import { getPlanLimits } from '../config/plans';
 export class UsageController {
   async get(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const ownerId = new mongoose.Types.ObjectId(req.user.id);
+      const userId = new mongoose.Types.ObjectId(req.user.id);
 
       const [storageResult, activeExecutions, user] = await Promise.all([
+        // Storage is charged to whoever uploaded the bytes, not the project
+        // they were uploaded into — see models/File.ts.
         File.aggregate([
-          { $match: { ownerId } },
+          { $match: { uploadedBy: userId } },
           { $group: { _id: null, totalBytes: { $sum: '$size' } } }
         ]),
-        Execution.countDocuments({ ownerId, status: { $in: ['PENDING', 'RUNNING'] } }),
+        Execution.countDocuments({ ownerId: userId, status: { $in: ['PENDING', 'RUNNING'] } }),
         User.findById(req.user.id).select('plan')
       ]);
 

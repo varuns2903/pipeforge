@@ -8,6 +8,7 @@ import { File } from '../src/models/File';
 const TEST_MONGODB_URI = 'mongodb://localhost:27017/pipeforge_test_usage';
 
 let token: string;
+let projectId: string;
 
 beforeAll(async () => {
   await mongoose.connect(TEST_MONGODB_URI);
@@ -16,6 +17,9 @@ beforeAll(async () => {
 
   const res = await request(app).post('/api/auth/register').send({ email: 'usage@example.com', password: 'password123', name: 'Usage User' });
   token = res.body.token;
+
+  const projectRes = await request(app).post('/api/projects').set('Authorization', `Bearer ${token}`).send({ name: 'Usage Project' });
+  projectId = projectRes.body.id;
 });
 
 afterAll(async () => {
@@ -34,7 +38,7 @@ describe('GET /api/usage', () => {
 
   it('reflects an uploaded file\'s size', async () => {
     await request(app)
-      .post('/api/files/upload')
+      .post(`/api/projects/${projectId}/files/upload`)
       .set('Authorization', `Bearer ${token}`)
       .attach('file', Buffer.alloc(1234, 'a'), 'usage-test.csv');
 

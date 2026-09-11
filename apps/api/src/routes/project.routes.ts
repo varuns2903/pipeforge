@@ -3,6 +3,8 @@ import { body } from 'express-validator';
 import { projectController } from '../controllers/project.controller';
 import { pipelineController } from '../controllers/pipeline.controller';
 import { executionController } from '../controllers/execution.controller';
+import { connectionController } from '../controllers/connection.controller';
+import { fileRouter } from './file.routes';
 import { requireAuth } from '../middleware/auth.middleware';
 import { validationResult } from 'express-validator';
 
@@ -58,3 +60,13 @@ projectRouter.delete('/:projectId/pipelines/:pipelineId/schedule', pipelineContr
 projectRouter.get('/:projectId/pipelines/:pipelineId/webhook', pipelineController.getWebhook);
 projectRouter.put('/:projectId/pipelines/:pipelineId/webhook', pipelineController.setWebhook);
 projectRouter.delete('/:projectId/pipelines/:pipelineId/webhook', pipelineController.clearWebhook);
+
+// Connection Routes (nested) — shared with every project member, unlike the
+// old global per-user /api/connections.
+projectRouter.post('/:projectId/connections', connectionController.create);
+projectRouter.get('/:projectId/connections', connectionController.list);
+projectRouter.get('/:projectId/connections/:connectionId', connectionController.get);
+projectRouter.delete('/:projectId/connections/:connectionId', connectionController.delete);
+
+// File Routes (nested) — mergeParams lets fileRouter read :projectId.
+projectRouter.use('/:projectId/files', fileRouter);

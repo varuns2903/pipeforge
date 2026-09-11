@@ -6,6 +6,7 @@ const CONNECTOR_NODE_TYPES = new Set(['postgres-input', 's3-input', 'api-input']
 const Connection = mongoose.model('Connection', connectionSchema);
 
 export interface ConnectionRecord {
+  projectId: any;
   config: any;
   encryptedSecret: string;
 }
@@ -44,6 +45,14 @@ export async function resolveConnections(
       const connection = await fetchConnection(connectionId);
       if (!connection) {
         throw new Error(`Connection ${connectionId} referenced by node '${node.data?.label || node.id}' was not found`);
+      }
+      // Connections are project-scoped (shared with every member of that
+      // project); this check is defense in depth against a hand-crafted or
+      // stale node config referencing a connection from a different
+      // project — the UI can never produce this, but the worker shouldn't
+      // trust that.
+      if (connection.projectId?.toString() !== pipeline.projectId?.toString()) {
+        throw new Error(`Connection ${connectionId} referenced by node '${node.data?.label || node.id}' does not belong to this pipeline's project`);
       }
 
       const secret = JSON.parse(decryptSecret(connection.encryptedSecret, encryptionKey));

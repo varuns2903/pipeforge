@@ -10,7 +10,7 @@ interface Connection {
   type: 'postgres' | 's3' | 'api';
 }
 
-export function ConfigPanel({ selectedNode, setNodes, setEdges }: { selectedNode: any, setNodes: any, setEdges: any }) {
+export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { selectedNode: any, setNodes: any, setEdges: any, projectId: string }) {
   const [config, setConfig] = useState<any>({});
   const [uploading, setUploading] = useState(false);
 
@@ -22,8 +22,8 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges }: { selectedNode
 
   const isConnectorNode = ['postgres-input', 's3-input', 'api-input'].includes(selectedNode?.data?.nodeType);
   const { data: connections } = useQuery<Connection[]>({
-    queryKey: ['connections'],
-    queryFn: async () => (await api.get('/connections')).data,
+    queryKey: ['connections', projectId],
+    queryFn: async () => (await api.get(`/projects/${projectId}/connections`)).data,
     enabled: isConnectorNode,
   });
 
@@ -54,7 +54,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges }: { selectedNode
 
     try {
       console.log('Sending to API...');
-      const res = await api.post('/files/upload', formData);
+      const res = await api.post(`/projects/${projectId}/files/upload`, formData);
       console.log('Upload success!', res.data);
       updateConfig({ filePath: res.data.filePath, originalName: res.data.originalName });
     } catch (err: any) {

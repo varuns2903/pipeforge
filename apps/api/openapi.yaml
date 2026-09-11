@@ -105,6 +105,10 @@ components:
         originalName: { type: string }
         size: { type: integer }
         createdAt: { type: string, format: date-time }
+        project:
+          type: object
+          description: 'Only present on the cross-project GET /files aggregate, not on the project-nested GET .../files.'
+          properties: { id: { type: string, nullable: true }, name: { type: string, nullable: true } }
     ExecutionSummary:
       type: object
       properties:
@@ -142,6 +146,7 @@ components:
         non-secret fields (host, bucket, baseUrl, etc.) appear in `config`.
       properties:
         id: { type: string }
+        projectId: { type: string }
         name: { type: string }
         type: { type: string, enum: [postgres, s3, api] }
         config: { type: object, description: 'Non-secret fields only, shape depends on type' }
@@ -721,9 +726,12 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { description: 'Too many active executions for this user (MAX_CONCURRENT_EXECUTIONS_PER_USER)' }
 
-  /files/upload:
+  /projects/{projectId}/files/upload:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
     post:
-      summary: Upload a .csv or .json dataset (used as a pipeline's csv-input/json-input source)
+      summary: Upload a .csv or .json dataset to this project (used as a pipeline's csv-input/json-input source), shared with every project member
+      description: Requires editor+ on the project. Storage quota is charged to the uploader personally, not the project.
       requestBody:
         required: true
         content:
@@ -744,11 +752,14 @@ paths:
                   originalName: { type: string }
                   size: { type: integer }
         '400': { description: 'No file, wrong type, or over the per-file size limit' }
-        '413': { description: 'Would exceed the user''s total storage quota (MAX_USER_STORAGE_MB)' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: "Would exceed the uploader's total storage quota" }
 
-  /files:
+  /projects/{projectId}/files:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
     get:
-      summary: List the current user's uploaded datasets
+      summary: List this project's uploaded datasets (viewer+)
       responses:
         '200':
           description: OK
@@ -757,15 +768,29 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/FileSummary' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
-  /files/{fileId}:
+  /projects/{projectId}/files/{fileId}:
     parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
       - { name: fileId, in: path, required: true, schema: { type: string } }
     delete:
-      summary: Delete an uploaded dataset (frees its storage quota)
+      summary: Delete an uploaded dataset (editor+; frees the uploader's storage quota)
       responses:
         '204': { description: Deleted }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /files:
+    get:
+      summary: List every dataset uploaded to any project the current user can see (owner or member), across projects
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FileSummary' }
 
   /executions:
     get:
@@ -780,9 +805,11 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/ExecutionSummary' }
 
-  /connections:
+  /projects/{projectId}/connections:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
     get:
-      summary: List the current user's saved connections
+      summary: List this project's saved connections (viewer+), shared with every member
       responses:
         '200':
           description: OK
@@ -791,8 +818,9 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Connection' }
+        '404': { $ref: '#/components/responses/NotFound' }
     post:
-      summary: Create a saved connection (Postgres, S3, or a generic API)
+      summary: Create a saved connection (Postgres, S3, or a generic API) in this project (editor+)
       description: >
         `secret` holds whatever's sensitive for the type and is encrypted at
         rest, never returned by any endpoint: `{ password }` for postgres,
@@ -814,19 +842,21 @@ paths:
           description: Created
           content: { application/json: { schema: { $ref: '#/components/schemas/Connection' } } }
         '400': { description: Missing required fields for the given type }
+        '404': { $ref: '#/components/responses/NotFound' }
 
-  /connections/{connectionId}:
+  /projects/{projectId}/connections/{connectionId}:
     parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
       - { name: connectionId, in: path, required: true, schema: { type: string } }
     get:
-      summary: Get a connection (never includes the secret)
+      summary: Get a connection (viewer+; never includes the secret)
       responses:
         '200':
           description: OK
           content: { application/json: { schema: { $ref: '#/components/schemas/Connection' } } }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
-      summary: Delete a connection
+      summary: Delete a connection (editor+)
       responses:
         '204': { description: Deleted }
         '404': { $ref: '#/components/responses/NotFound' }

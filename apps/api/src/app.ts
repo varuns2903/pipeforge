@@ -12,8 +12,7 @@ import { WEB_URL } from './config/env';
 import { logger } from './logger';
 import { authRouter } from './routes/auth.routes';
 import { projectRouter } from './routes/project.routes';
-import { fileRouter } from './routes/file.routes';
-import { connectionRouter } from './routes/connection.routes';
+import { myFilesRouter } from './routes/myFiles.routes';
 import { usageRouter } from './routes/usage.routes';
 import { myExecutionsRouter } from './routes/myExecutions.routes';
 import { billingRouter } from './routes/billing.routes';
@@ -74,8 +73,11 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
 app.use('/api/auth', authRouter);
 app.use('/api/projects', projectRouter);
-app.use('/api/files', fileRouter);
-app.use('/api/connections', connectionRouter);
+// Aggregate, cross-project views — GET-only. Uploading/deleting a file or
+// creating/deleting a connection always happens within a specific project's
+// nested routes above (projectRouter), which is where the editor+ role
+// check for that mutation lives.
+app.use('/api/files', myFilesRouter);
 app.use('/api/usage', usageRouter);
 app.use('/api/executions', myExecutionsRouter);
 app.use('/api/billing', billingRouter);

@@ -1,6 +1,7 @@
 import { encryptSecret } from '@pipeforge/shared';
 import { Connection } from '../models/Connection';
 import { CONNECTION_ENCRYPTION_KEY } from '../config/env';
+import { projectService } from './project.service';
 
 const ALLOWED_TYPES = ['postgres', 's3', 'api'] as const;
 type ConnectionType = typeof ALLOWED_TYPES[number];
@@ -27,30 +28,37 @@ function validateConfig(type: ConnectionType, config: any, secret: any) {
 }
 
 export class ConnectionService {
-  async create(ownerId: string, name: string, type: ConnectionType, config: any, secret: any) {
+  // Shared with any project member (any role) — like Pipeline, access is
+  // entirely derived from project membership, not from who created it.
+  async create(projectId: string, userId: string, name: string, type: ConnectionType, config: any, secret: any) {
+    await projectService.getById(projectId, userId, 'editor');
+
     if (!ALLOWED_TYPES.includes(type)) {
       throw new Error(`Unknown connection type: ${type}`);
     }
     validateConfig(type, config, secret);
 
     const encryptedSecret = encryptSecret(JSON.stringify(secret || {}), CONNECTION_ENCRYPTION_KEY);
-    const connection = new Connection({ ownerId, name, type, config, encryptedSecret });
+    const connection = new Connection({ projectId, createdBy: userId, name, type, config, encryptedSecret });
     await connection.save();
     return connection;
   }
 
-  async list(ownerId: string) {
-    return Connection.find({ ownerId }).sort({ name: 1 });
+  async list(projectId: string, userId: string) {
+    await projectService.getById(projectId, userId, 'viewer');
+    return Connection.find({ projectId }).sort({ name: 1 });
   }
 
-  async getById(connectionId: string, ownerId: string) {
-    const connection = await Connection.findOne({ _id: connectionId, ownerId });
+  async getById(connectionId: string, projectId: string, userId: string, minRole: 'viewer' | 'editor' = 'viewer') {
+    await projectService.getById(projectId, userId, minRole);
+    const connection = await Connection.findOne({ _id: connectionId, projectId });
     if (!connection) throw new Error('Connection not found');
     return connection;
   }
 
-  async delete(connectionId: string, ownerId: string) {
-    const connection = await Connection.findOneAndDelete({ _id: connectionId, ownerId });
+  async delete(connectionId: string, projectId: string, userId: string) {
+    await projectService.getById(projectId, userId, 'editor');
+    const connection = await Connection.findOneAndDelete({ _id: connectionId, projectId });
     if (!connection) throw new Error('Connection not found');
     return connection;
   }

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { Project, Pipeline } from '@pipeforge/shared';
-import { Workflow, Plus, Trash2, ArrowLeft, Settings2, Users } from 'lucide-react';
+import { Workflow, Plus, Trash2, ArrowLeft, Settings2, Users, Plug } from 'lucide-react';
 import { TrashModal } from '../components/TrashModal';
 import { MembersModal } from '../components/MembersModal';
 import { useAuthStore } from '../store/authStore';
@@ -78,6 +78,12 @@ export function ProjectDetail() {
           )}
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            to={`/projects/${projectId}/connections`}
+            className="glass-button px-3 py-2 rounded-md flex items-center gap-2 text-sm"
+          >
+            <Plug size={16} /> Connections
+          </Link>
           <button
             onClick={() => setShowMembers(true)}
             className="glass-button px-3 py-2 rounded-md flex items-center gap-2 text-sm"

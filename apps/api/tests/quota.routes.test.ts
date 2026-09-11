@@ -18,6 +18,7 @@ const { File } = await import('../src/models/File');
 const TEST_MONGODB_URI = 'mongodb://localhost:27017/pipeforge_test_quota';
 
 let token: string;
+let storageProjectId: string;
 
 beforeAll(async () => {
   await mongoose.connect(TEST_MONGODB_URI);
@@ -29,6 +30,9 @@ beforeAll(async () => {
 
   const res = await request(app).post('/api/auth/register').send({ email: 'quota@example.com', password: 'password123', name: 'Quota User' });
   token = res.body.token;
+
+  const projectRes = await request(app).post('/api/projects').set('Authorization', `Bearer ${token}`).send({ name: 'Storage Quota Project' });
+  storageProjectId = projectRes.body.id;
 });
 
 afterAll(async () => {
@@ -38,7 +42,7 @@ afterAll(async () => {
 describe('Storage quota', () => {
   it('accepts an upload that exactly fills the quota', async () => {
     const res = await request(app)
-      .post('/api/files/upload')
+      .post(`/api/projects/${storageProjectId}/files/upload`)
       .set('Authorization', `Bearer ${token}`)
       .attach('file', Buffer.alloc(FIRST_FILE_BYTES, 'a'), 'exact.csv');
 
@@ -47,7 +51,7 @@ describe('Storage quota', () => {
 
   it('rejects a further upload that would exceed the quota', async () => {
     const res = await request(app)
-      .post('/api/files/upload')
+      .post(`/api/projects/${storageProjectId}/files/upload`)
       .set('Authorization', `Bearer ${token}`)
       .attach('file', Buffer.from('x'), 'onemore.csv');
 

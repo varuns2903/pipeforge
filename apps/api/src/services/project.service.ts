@@ -28,6 +28,17 @@ export class ProjectService {
     }).sort({ updatedAt: -1 }).limit(200);
   }
 
+  // Just the ids, for callers that need to scope a query across every
+  // project a user can see (e.g. an aggregate cross-project file/dataset
+  // list) without loading the full Project documents.
+  async listAccessibleProjectIds(userId: string): Promise<string[]> {
+    const projects = await Project.find({
+      deletedAt: null,
+      $or: [{ ownerId: userId }, { 'members.userId': userId }],
+    }).select('_id');
+    return projects.map(p => p._id.toString());
+  }
+
   // `minRole` gates both existence and access in one check: a project a user
   // can't see at all and one they can see but lack permission for both come
   // back as "Project not found" — deliberately not "Forbidden", so probing a

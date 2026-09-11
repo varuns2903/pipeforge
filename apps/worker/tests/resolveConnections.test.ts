@@ -14,10 +14,12 @@ vi.mock('mongoose', () => ({
 import { resolveConnections } from '../src/resolveConnections';
 
 const ENCRYPTION_KEY = 'test-key';
+const PROJECT_ID = 'project1';
 
 describe('resolveConnections', () => {
   it('leaves non-connector nodes untouched', async () => {
     const pipeline = {
+      projectId: PROJECT_ID,
       nodes: [{ id: 'n1', data: { nodeType: 'filter', config: { field: 'x' } } }],
     };
     const fetchConnection = vi.fn();
@@ -30,6 +32,7 @@ describe('resolveConnections', () => {
 
   it('leaves connector nodes without a connectionId untouched', async () => {
     const pipeline = {
+      projectId: PROJECT_ID,
       nodes: [{ id: 'n1', data: { nodeType: 's3-input', config: { key: 'file.csv' } } }],
     };
     const fetchConnection = vi.fn();
@@ -42,6 +45,7 @@ describe('resolveConnections', () => {
 
   it('merges connection config, decrypted secret, and node config, with node config winning', async () => {
     const pipeline = {
+      projectId: PROJECT_ID,
       nodes: [{
         id: 'n1',
         data: {
@@ -53,6 +57,7 @@ describe('resolveConnections', () => {
     };
 
     const fetchConnection = vi.fn().mockResolvedValue({
+      projectId: PROJECT_ID,
       config: { host: 'db.example.com', port: 5432 },
       encryptedSecret: JSON.stringify({ password: 'secret-pw', port: 9999 }),
     });
@@ -71,6 +76,7 @@ describe('resolveConnections', () => {
 
   it('throws a clear error when the referenced connection does not exist', async () => {
     const pipeline = {
+      projectId: PROJECT_ID,
       nodes: [{
         id: 'n1',
         data: { nodeType: 'api-input', label: 'My API', config: { connectionId: 'missing' } },
@@ -82,14 +88,34 @@ describe('resolveConnections', () => {
       .rejects.toThrow(/My API.*not found|not found.*My API/);
   });
 
+  it('throws when the connection belongs to a different project than the pipeline', async () => {
+    const pipeline = {
+      projectId: PROJECT_ID,
+      nodes: [{
+        id: 'n1',
+        data: { nodeType: 'api-input', label: 'My API', config: { connectionId: 'conn1' } },
+      }],
+    };
+    const fetchConnection = vi.fn().mockResolvedValue({
+      projectId: 'some-other-project',
+      config: { baseUrl: 'https://example.com' },
+      encryptedSecret: JSON.stringify({ token: 'x' }),
+    });
+
+    await expect(resolveConnections(pipeline, ENCRYPTION_KEY, fetchConnection))
+      .rejects.toThrow(/does not belong to this pipeline's project/);
+  });
+
   it('does not mutate the input pipeline', async () => {
     const pipeline = {
+      projectId: PROJECT_ID,
       nodes: [{
         id: 'n1',
         data: { nodeType: 's3-input', config: { connectionId: 'conn1', key: 'file.csv' } },
       }],
     };
     const fetchConnection = vi.fn().mockResolvedValue({
+      projectId: PROJECT_ID,
       config: { bucket: 'my-bucket' },
       encryptedSecret: JSON.stringify({ accessKeyId: 'AKIA...' }),
     });
