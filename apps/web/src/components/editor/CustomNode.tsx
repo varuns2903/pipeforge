@@ -1,6 +1,7 @@
 import { Handle, Position } from '@xyflow/react';
 import { useDirection } from './DirectionContext';
-import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, GitBranch, FileSpreadsheet } from 'lucide-react';
+import { useNodeValidation } from './ValidationContext';
+import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, GitBranch, FileSpreadsheet, AlertCircle, AlertTriangle } from 'lucide-react';
 
 const icons: Record<string, any> = {
   'csv-input': Database,
@@ -31,13 +32,30 @@ const getCategoryColor = (type: string) => {
   return 'bg-amber-500'; // Transform
 };
 
-export function CustomNode({ data, selected }: any) {
+export function CustomNode({ id, data, selected }: any) {
   const direction = useDirection();
   const isHorizontal = direction === 'LR';
   const Icon = icons[data.nodeType] || Settings;
-  
+  const { errors, warnings } = useNodeValidation(id);
+  const hasError = errors.length > 0;
+  const hasWarning = !hasError && warnings.length > 0;
+
+  const borderClass = hasError
+    ? 'border-status-error shadow-[0_0_15px_rgba(239,68,68,0.35)]'
+    : selected
+      ? 'border-accent-500 shadow-[0_0_15px_var(--color-accent-glow)]'
+      : 'border-border-strong';
+
   return (
-    <div className={`relative px-4 py-3 min-w-[180px] rounded-xl bg-surface-2/90 backdrop-blur-md border ${selected ? 'border-accent-500 shadow-[0_0_15px_var(--color-accent-glow)]' : 'border-border-strong'} transition-all duration-200`}>
+    <div className={`relative px-4 py-3 min-w-[180px] rounded-xl bg-surface-2/90 backdrop-blur-md border ${borderClass} transition-all duration-200`}>
+      {(hasError || hasWarning) && (
+        <div
+          className={`absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center border-2 border-background ${hasError ? 'bg-status-error' : 'bg-status-warning'}`}
+          title={[...errors, ...warnings].join('\n')}
+        >
+          {hasError ? <AlertCircle size={12} className="text-white" /> : <AlertTriangle size={11} className="text-white" />}
+        </div>
+      )}
       {/* Input handle */}
       {!data.nodeType.includes('input') && (
         <Handle 

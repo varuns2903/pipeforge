@@ -2,6 +2,12 @@ export interface ValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
+  // Same messages as `errors`/`warnings`, but keyed by the node they're
+  // about — lets a UI badge the exact broken node instead of only showing a
+  // flat list. Messages with no single owning node (e.g. a graph-wide cycle)
+  // appear in `errors`/`warnings` but not here.
+  nodeErrors: Record<string, string[]>;
+  nodeWarnings: Record<string, string[]>;
 }
 
 export class PipelineValidator {
@@ -9,7 +15,24 @@ export class PipelineValidator {
     const result: ValidationResult = {
       isValid: true,
       errors: [],
-      warnings: []
+      warnings: [],
+      nodeErrors: {},
+      nodeWarnings: {},
+    };
+
+    const addError = (node: any, message: string) => {
+      result.errors.push(message);
+      result.isValid = false;
+      if (node?.id) {
+        (result.nodeErrors[node.id] ??= []).push(message);
+      }
+    };
+
+    const addWarning = (node: any, message: string) => {
+      result.warnings.push(message);
+      if (node?.id) {
+        (result.nodeWarnings[node.id] ??= []).push(message);
+      }
     };
 
     if (!pipeline || !pipeline.nodes || !pipeline.edges) {
@@ -29,65 +52,53 @@ export class PipelineValidator {
     nodes.forEach((node: any) => {
       const type = node.data?.nodeType;
       const config = node.data?.config || {};
-      
+
       if (!type) {
-        result.errors.push(`Node ${node.id} is missing a nodeType.`);
-        result.isValid = false;
+        addError(node, `Node ${node.id} is missing a nodeType.`);
       }
 
       if (type === 'csv-input' && !config.filePath) {
-        result.errors.push(`Node '${node.data.label}' (csv-input) requires a filePath.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (csv-input) requires a filePath.`);
       }
 
       if (type === 'excel-input' && !config.filePath) {
-        result.errors.push(`Node '${node.data.label}' (excel-input) requires a filePath.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (excel-input) requires a filePath.`);
       }
-      
+
       if (type === 'filter' && !config.condition) {
-        result.errors.push(`Node '${node.data.label}' (filter) requires a condition.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (filter) requires a condition.`);
       }
 
       if (type === 'branch' && !config.condition) {
-        result.errors.push(`Node '${node.data.label}' (branch) requires a condition.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (branch) requires a condition.`);
       }
 
       if (type === 'join' && !config.leftKey) {
-        result.errors.push(`Node '${node.data.label}' (join) requires a leftKey.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (join) requires a leftKey.`);
       }
 
       if (type === 'window' && !config.orderBy) {
-        result.errors.push(`Node '${node.data.label}' (window) requires an orderBy column.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (window) requires an orderBy column.`);
       }
 
       if ((type === 'fill-nulls' || type === 'cast-type') && !config.column) {
-        result.errors.push(`Node '${node.data.label}' (${type}) requires a column.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (${type}) requires a column.`);
       }
 
       if (type === 'cast-type' && !config.targetType) {
-        result.errors.push(`Node '${node.data.label}' (cast-type) requires a targetType.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (cast-type) requires a targetType.`);
       }
 
       if ((type === 'postgres-input' || type === 'mysql-input' || type === 's3-input' || type === 'api-input') && !config.connectionId) {
-        result.errors.push(`Node '${node.data.label}' (${type}) requires a connectionId.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (${type}) requires a connectionId.`);
       }
 
       if ((type === 'postgres-input' || type === 'mysql-input') && !config.query) {
-        result.errors.push(`Node '${node.data.label}' (${type}) requires a query.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (${type}) requires a query.`);
       }
 
       if (type === 's3-input' && !config.key) {
-        result.errors.push(`Node '${node.data.label}' (s3-input) requires a key (object path in the bucket).`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (s3-input) requires a key (object path in the bucket).`);
       }
     });
 
@@ -95,7 +106,7 @@ export class PipelineValidator {
     const adjList: Record<string, string[]> = {};
     const inDegree: Record<string, number> = {};
     const outDegree: Record<string, number> = {};
-    
+
     nodes.forEach((n: any) => {
       adjList[n.id] = [];
       inDegree[n.id] = 0;
@@ -116,7 +127,7 @@ export class PipelineValidator {
     // 3. Detect Cycles (Kahn's Algorithm)
     let visitedCount = 0;
     const queue: string[] = [];
-    
+
     Object.keys(inDegree).forEach(nodeId => {
       if (inDegree[nodeId] === 0) {
         queue.push(nodeId);
@@ -126,7 +137,7 @@ export class PipelineValidator {
     while (queue.length > 0) {
       const current = queue.shift()!;
       visitedCount++;
-      
+
       const neighbors = adjList[current] || [];
       for (const neighbor of neighbors) {
         inDegree[neighbor]!--;
@@ -141,16 +152,9 @@ export class PipelineValidator {
       result.isValid = false;
     }
 
-    // 4. Warning: Disconnected Nodes or missing outputs/inputs
-    nodes.forEach((node: any) => {
-      const type = node.data?.nodeType || '';
-      const nodeIn = inDegree[node.id] || 0;
-      const nodeOut = outDegree[node.id] || 0;
-      
-      // Original inDegree was modified by Kahn's, let's recalculate for checks
-    });
-    
-    // Recalculate original inDegree
+    // 4. Warning: Disconnected Nodes or missing outputs/inputs. Recalculate
+    // in-degree from the edges directly — Kahn's algorithm above consumed
+    // the `inDegree` map as it ran.
     const origInDegree: Record<string, number> = {};
     nodes.forEach((n: any) => origInDegree[n.id] = 0);
     edges.forEach((edge: any) => {
@@ -165,21 +169,19 @@ export class PipelineValidator {
       const nout = outDegree[node.id] || 0;
 
       if (!type.includes('input') && nin === 0) {
-        result.warnings.push(`Node '${node.data.label}' has no incoming connections.`);
+        addWarning(node, `Node '${node.data.label}' has no incoming connections.`);
       }
-      
+
       if (!type.includes('output') && nout === 0) {
-        result.warnings.push(`Node '${node.data.label}' has no outgoing connections.`);
+        addWarning(node, `Node '${node.data.label}' has no outgoing connections.`);
       }
 
       if (type === 'join' && nin !== 2) {
-        result.errors.push(`Node '${node.data.label}' (join) requires exactly 2 incoming connections (left and right), found ${nin}.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (join) requires exactly 2 incoming connections (left and right), found ${nin}.`);
       }
 
       if (type === 'union' && nin < 2) {
-        result.errors.push(`Node '${node.data.label}' (union) requires at least 2 incoming connections, found ${nin}.`);
-        result.isValid = false;
+        addError(node, `Node '${node.data.label}' (union) requires at least 2 incoming connections, found ${nin}.`);
       }
     });
 

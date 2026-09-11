@@ -26,6 +26,7 @@ import { ScheduleModal } from '../components/editor/ScheduleModal';
 import { NotificationsModal } from '../components/editor/NotificationsModal';
 import { WebhookModal } from '../components/editor/WebhookModal';
 import { DirectionContext } from '../components/editor/DirectionContext';
+import { ValidationContext, type NodeValidationState } from '../components/editor/ValidationContext';
 import { LayoutList, LayoutPanelLeft } from 'lucide-react';
 import { getLayoutedElements } from '../components/editor/layout';
 import { useHistory } from '../components/editor/useHistory';
@@ -45,6 +46,10 @@ function EditorCanvas() {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [validationResult, setValidationResult] = useState<{isValid: boolean, errors: string[], warnings: string[]} | null>(null);
+  // Separate from validationResult (which auto-clears after 5s for the toast
+  // list) — node badges stay put until the pipeline is next validated, so
+  // "which node is broken" doesn't vanish along with the toast.
+  const [nodeValidation, setNodeValidation] = useState<NodeValidationState>({ nodeErrors: {}, nodeWarnings: {} });
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
@@ -67,6 +72,7 @@ function EditorCanvas() {
       setNodes(pipeline.nodes || []);
       setEdges(pipeline.edges || []);
       resetHistory();
+      setNodeValidation({ nodeErrors: {}, nodeWarnings: {} });
     }
   }, [pipeline, setNodes, setEdges, resetHistory]);
 
@@ -205,8 +211,10 @@ function EditorCanvas() {
     await handleSave(); // Save first before validate
     const res = await api.get(`/projects/${projectId}/pipelines/${pipelineId}/validate`);
     setValidationResult(res.data);
-    
-    // Auto-clear validation result after 5s
+    setNodeValidation({ nodeErrors: res.data.nodeErrors || {}, nodeWarnings: res.data.nodeWarnings || {} });
+
+    // Auto-clear the toast list after 5s — node badges (nodeValidation)
+    // stay until the next validate call.
     setTimeout(() => setValidationResult(null), 5000);
   };
 
@@ -214,6 +222,7 @@ function EditorCanvas() {
 
   return ( 
     <DirectionContext.Provider value={direction}>
+    <ValidationContext.Provider value={nodeValidation}>
     <div className="flex flex-col h-screen w-screen bg-background overflow-hidden text-text-primary">
       {/* Top Header */}
       <header className="h-14 bg-surface-1 border-b border-border-strong flex items-center justify-between px-4 z-50 shrink-0">
@@ -371,8 +380,9 @@ function EditorCanvas() {
         )}
       </div>
     </div>
+    </ValidationContext.Provider>
     </DirectionContext.Provider>
-    
+
   );
 }
 

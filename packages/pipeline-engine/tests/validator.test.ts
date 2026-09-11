@@ -38,6 +38,45 @@ describe('PipelineValidator', () => {
     expect(result.errors[0]).toContain('requires a filePath');
   });
 
+  it('keys each error by the id of the node it belongs to, for UI badging', () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: 'mock' } } },
+        { id: '2', data: { nodeType: 'filter', label: 'Bad Filter', config: {} } },
+      ],
+      edges: [{ source: '1', target: '2' }]
+    };
+    const result = validator.validate(pipeline);
+    expect(result.isValid).toBe(false);
+    expect(result.nodeErrors['2']).toEqual(["Node 'Bad Filter' (filter) requires a condition."]);
+    expect(result.nodeErrors['1']).toBeUndefined();
+  });
+
+  it('keys warnings by node id too (e.g. a dangling node with no outgoing connection)', () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: 'mock' } } },
+      ],
+      edges: []
+    };
+    const result = validator.validate(pipeline);
+    expect(result.nodeWarnings['1']).toEqual(["Node 'Input' has no outgoing connections."]);
+  });
+
+  it('a graph-wide error like a cycle has no single owning node', () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'filter', label: 'A', config: { condition: 'true' } } },
+        { id: '2', data: { nodeType: 'filter', label: 'B', config: { condition: 'true' } } },
+      ],
+      edges: [{ source: '1', target: '2' }, { source: '2', target: '1' }]
+    };
+    const result = validator.validate(pipeline);
+    expect(result.errors.some(e => e.includes('Cycle detected'))).toBe(true);
+    expect(result.nodeErrors['1'] || []).not.toContain(expect.stringContaining('Cycle detected'));
+    expect(result.nodeErrors['2'] || []).not.toContain(expect.stringContaining('Cycle detected'));
+  });
+
   it('should invalidate an excel-input node missing a filePath', () => {
     const pipeline = {
       nodes: [
