@@ -8,12 +8,14 @@ import { TrashModal } from '../components/TrashModal';
 import { MembersModal } from '../components/MembersModal';
 import { ActivityLogModal } from '../components/ActivityLogModal';
 import { useAuthStore } from '../store/authStore';
+import { PIPELINE_TEMPLATES } from '../lib/pipelineTemplates';
 
 export function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
   const [newPipelineName, setNewPipelineName] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState(PIPELINE_TEMPLATES[0]!.id);
   const [isCreating, setIsCreating] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
@@ -37,13 +39,25 @@ export function ProjectDetail() {
   });
 
   const createPipeline = useMutation({
-    mutationFn: async (name: string) => {
+    mutationFn: async ({ name, templateId }: { name: string; templateId: string }) => {
       const res = await api.post(`/projects/${projectId}/pipelines`, { name });
+      const template = PIPELINE_TEMPLATES.find(t => t.id === templateId);
+      if (template && template.nodes.length > 0) {
+        // Templates are applied as a second save rather than passed to the
+        // create call — keeps the create endpoint's contract (just a name)
+        // unchanged, and reuses the same update path a normal editor save
+        // already goes through.
+        await api.put(`/projects/${projectId}/pipelines/${res.data.id}`, {
+          nodes: template.nodes,
+          edges: template.edges,
+        });
+      }
       return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipelines', projectId] });
       setNewPipelineName('');
+      setSelectedTemplateId(PIPELINE_TEMPLATES[0]!.id);
       setIsCreating(false);
     }
   });
@@ -146,27 +160,50 @@ export function ProjectDetail() {
       )}
 
       {isCreating && (
-        <div className="mb-8 glass-panel p-5 rounded-xl border border-border-strong flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="mb-8 glass-panel p-5 rounded-xl border border-border-strong flex flex-col gap-4 animate-in fade-in slide-in-from-top-4 duration-200">
           <input
             type="text"
             value={newPipelineName}
             onChange={(e) => setNewPipelineName(e.target.value)}
             placeholder="e.g. Daily Data Dump"
-            className="flex-1 px-4 py-2 bg-surface-2 border border-border-subtle rounded-md text-sm focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
+            className="w-full px-4 py-2 bg-surface-2 border border-border-subtle rounded-md text-sm focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
             autoFocus
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && newPipelineName.trim()) createPipeline.mutate(newPipelineName);
+              if (e.key === 'Enter' && newPipelineName.trim()) createPipeline.mutate({ name: newPipelineName, templateId: selectedTemplateId });
               if (e.key === 'Escape') setIsCreating(false);
             }}
           />
-          <button 
-            onClick={() => { if(newPipelineName.trim()) createPipeline.mutate(newPipelineName) }}
-            disabled={createPipeline.isPending}
-            className="glass-button px-4 py-2 rounded-md text-sm"
-          >
-            Create
-          </button>
-          <button onClick={() => setIsCreating(false)} className="text-text-tertiary hover:text-text-primary text-sm px-2">Cancel</button>
+
+          <div>
+            <p className="text-xs font-medium text-text-tertiary uppercase tracking-wider mb-2">Start from</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {PIPELINE_TEMPLATES.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setSelectedTemplateId(t.id)}
+                  className={`text-left p-3 rounded-lg border text-xs transition-colors ${
+                    selectedTemplateId === t.id
+                      ? 'border-accent-500 bg-accent-500/10'
+                      : 'border-border-subtle bg-surface-2 hover:border-border-strong'
+                  }`}
+                >
+                  <div className="font-medium text-text-primary mb-1">{t.name}</div>
+                  <div className="text-text-tertiary leading-snug">{t.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => { if (newPipelineName.trim()) createPipeline.mutate({ name: newPipelineName, templateId: selectedTemplateId }); }}
+              disabled={createPipeline.isPending}
+              className="glass-button px-4 py-2 rounded-md text-sm"
+            >
+              {createPipeline.isPending ? 'Creating...' : 'Create'}
+            </button>
+            <button onClick={() => setIsCreating(false)} className="text-text-tertiary hover:text-text-primary text-sm px-2">Cancel</button>
+          </div>
         </div>
       )}
 
