@@ -1,6 +1,6 @@
 import { Handle, Position } from '@xyflow/react';
 import { useDirection } from './DirectionContext';
-import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe } from 'lucide-react';
+import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, GitBranch } from 'lucide-react';
 
 const icons: Record<string, any> = {
   'csv-input': Database,
@@ -9,6 +9,7 @@ const icons: Record<string, any> = {
   's3-input': Cloud,
   'api-input': Globe,
   'filter': Filter,
+  'branch': GitBranch,
   'select-columns': Settings,
   'rename-columns': Settings,
   'sort': ArrowDownAZ,
@@ -53,13 +54,34 @@ export function CustomNode({ data, selected }: any) {
         </div>
       </div>
 
-      {/* Output handle */}
-      {!data.nodeType.includes('output') && (
-        <Handle 
-          type="source" 
-          position={isHorizontal ? Position.Right : Position.Bottom} 
-          className="!w-3 !h-3 !bg-surface-3 !border-2 !border-border-strong hover:!border-accent-500 transition-colors" 
-        />
+      {/* Output handle(s) */}
+      {data.nodeType === 'branch' ? (
+        <>
+          <Handle
+            type="source"
+            id="true"
+            position={isHorizontal ? Position.Right : Position.Bottom}
+            style={isHorizontal ? { top: '35%' } : { left: '30%' }}
+            className="!w-3 !h-3 !bg-status-success/30 !border-2 !border-status-success hover:!border-accent-500 transition-colors"
+          />
+          <div className={`absolute text-[9px] text-status-success font-medium ${isHorizontal ? 'right-[-22px] top-[28%]' : 'bottom-[-18px] left-[22%]'}`}>true</div>
+          <Handle
+            type="source"
+            id="false"
+            position={isHorizontal ? Position.Right : Position.Bottom}
+            style={isHorizontal ? { top: '65%' } : { left: '70%' }}
+            className="!w-3 !h-3 !bg-status-error/30 !border-2 !border-status-error hover:!border-accent-500 transition-colors"
+          />
+          <div className={`absolute text-[9px] text-status-error font-medium ${isHorizontal ? 'right-[-26px] top-[62%]' : 'bottom-[-18px] left-[62%]'}`}>false</div>
+        </>
+      ) : (
+        !data.nodeType.includes('output') && (
+          <Handle
+            type="source"
+            position={isHorizontal ? Position.Right : Position.Bottom}
+            className="!w-3 !h-3 !bg-surface-3 !border-2 !border-border-strong hover:!border-accent-500 transition-colors"
+          />
+        )
       )}
     </div>
   );

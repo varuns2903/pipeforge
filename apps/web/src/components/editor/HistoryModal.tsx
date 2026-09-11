@@ -65,7 +65,13 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
 
     // Find output node if exists
     const outputKey = keys.find(k => k.includes('output')) || keys[keys.length - 1];
-    return results[outputKey] || [];
+    const value = results[outputKey] || [];
+    // A `branch` node left unconnected on one or both sides ends up as the
+    // "final" node — its output is { true: [...], false: [...] } rather than
+    // a row array. Flatten both sides so the table below still has rows to
+    // render instead of crashing on a non-array value.
+    if (Array.isArray(value)) return value;
+    return [...(value.true || []), ...(value.false || [])];
   };
 
   // Determine which node produced the final output so we know whether to

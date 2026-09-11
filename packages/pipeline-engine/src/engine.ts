@@ -46,8 +46,17 @@ function normalizeExcelCell(value: any): any {
   return value ?? null;
 }
 
+// A node's output is normally a flat row array. `branch` is the one
+// exception — it routes rows down two named outputs ("true"/"false")
+// instead of concatenating them, so its output is keyed by branch name
+// instead. Downstream edges pick the right branch via their sourceHandle.
+export type BranchOutput = { true: any[]; false: any[] };
+export function isBranchOutput(value: any): value is BranchOutput {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 export interface ExecutionContext {
-  [nodeId: string]: any[]; // the output data of each node (array of objects)
+  [nodeId: string]: any[] | BranchOutput;
 }
 
 export interface EngineCallbacks {
@@ -106,9 +115,17 @@ export class PipelineEngine {
       
       // One array per incoming edge (in edge order) rather than pre-flattened —
       // most node types just flatten these themselves, but `join` needs its
-      // two input datasets kept separate.
+      // two input datasets kept separate. When the source is a `branch` node,
+      // sourceHandle ("true"/"false") picks which of its two outputs this
+      // edge actually carries.
       const incomingEdges = edges.filter((e: any) => e.target === nodeId);
-      const inputs: any[][] = incomingEdges.map((edge: any) => context[edge.source] || []);
+      const inputs: any[][] = incomingEdges.map((edge: any) => {
+        const sourceOutput = context[edge.source];
+        if (isBranchOutput(sourceOutput)) {
+          return sourceOutput[(edge.sourceHandle as 'true' | 'false') || 'true'] || [];
+        }
+        return sourceOutput || [];
+      });
 
       try {
         const startTime = Date.now();
@@ -120,8 +137,11 @@ export class PipelineEngine {
         context[nodeId] = outputData;
 
         const duration = Date.now() - startTime;
+        const rowCount = isBranchOutput(outputData)
+          ? outputData.true.length + outputData.false.length
+          : outputData.length;
         if (callbacks?.onNodeComplete) {
-          callbacks.onNodeComplete(nodeId, duration, outputData.length);
+          callbacks.onNodeComplete(nodeId, duration, rowCount);
         }
         
       } catch (err: any) {
@@ -135,7 +155,7 @@ export class PipelineEngine {
     return context;
   }
 
-  private async executeNode(type: string, config: any, inputs: any[][]): Promise<any[]> {
+  private async executeNode(type: string, config: any, inputs: any[][]): Promise<any[] | BranchOutput> {
     // Every node type except `join` treats all its incoming edges as one
     // combined dataset (matches the pre-existing single-input behavior).
     const input = inputs.flat();
@@ -366,6 +386,26 @@ export class PipelineEngine {
             return false;
           }
         });
+      }
+
+      case 'branch': {
+        // Unlike filter (which drops non-matching rows), branch keeps every
+        // row — it routes each one down exactly one of two named outputs so
+        // both paths can be wired to different downstream transforms.
+        if (!config.condition) return { true: input, false: [] };
+        const filterFn = compileFilterCondition(config.condition);
+        const trueRows: any[] = [];
+        const falseRows: any[] = [];
+        for (const row of input) {
+          let matches = false;
+          try {
+            matches = !!filterFn(row);
+          } catch (e) {
+            matches = false;
+          }
+          (matches ? trueRows : falseRows).push(row);
+        }
+        return { true: trueRows, false: falseRows };
       }
 
       case 'rename-columns':

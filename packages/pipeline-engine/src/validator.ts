@@ -50,6 +50,11 @@ export class PipelineValidator {
         result.isValid = false;
       }
 
+      if (type === 'branch' && !config.condition) {
+        result.errors.push(`Node '${node.data.label}' (branch) requires a condition.`);
+        result.isValid = false;
+      }
+
       if (type === 'join' && !config.leftKey) {
         result.errors.push(`Node '${node.data.label}' (join) requires a leftKey.`);
         result.isValid = false;

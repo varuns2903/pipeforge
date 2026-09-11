@@ -155,7 +155,22 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { s
               <p className="text-xs text-text-tertiary mt-2">Use valid JavaScript expression returning boolean. (Numbers are auto-cast!)</p>
             </div>
           )}
-          
+
+          {/* BRANCH */}
+          {selectedNode.data.nodeType === 'branch' && (
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Condition Expression</label>
+              <input
+                type="text"
+                value={config.condition || ''}
+                onChange={(e) => updateConfig({ condition: e.target.value })}
+                className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                placeholder="row.age > 18"
+              />
+              <p className="text-xs text-text-tertiary mt-2">Every row is kept — matching rows go out the <span className="text-status-success">true</span> connection, everything else goes out the <span className="text-status-error">false</span> connection. Connect each one to a different downstream node.</p>
+            </div>
+          )}
+
                     {/* JSON INPUT */}
           {selectedNode.data.nodeType === 'json-input' && (
             <div>

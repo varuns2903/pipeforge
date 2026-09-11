@@ -1,4 +1,4 @@
-import { Database, Filter, Settings, FileOutput, Calculator, Type, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, Combine, ListOrdered, FileJson, FileSpreadsheet } from 'lucide-react';
+import { Database, Filter, Settings, FileOutput, Calculator, Type, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, Combine, ListOrdered, FileJson, FileSpreadsheet, GitBranch } from 'lucide-react';
 
 const NODE_TYPES = [
   { category: 'Input', items: [
@@ -13,6 +13,7 @@ const NODE_TYPES = [
   ]},
   { category: 'Transform', items: [
     { type: 'filter', label: 'Filter Rows', icon: Filter },
+    { type: 'branch', label: 'Branch (If/Else)', icon: GitBranch },
     { type: 'select-columns', label: 'Select Columns', icon: Settings },
     { type: 'rename-columns', label: 'Rename Columns', icon: Type },
     { type: 'sort', label: 'Sort Data', icon: ArrowDownAZ },
