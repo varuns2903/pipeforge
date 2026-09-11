@@ -154,6 +154,16 @@ paths:
         '200':
           description: OK
 
+  /metrics:
+    get:
+      summary: Prometheus scrape target (process metrics, HTTP request duration/count, pipeline executions queued)
+      description: Intentionally unauthenticated, matching standard Prometheus exporter practice — a scraper carries no user session.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content: { text/plain: { schema: { type: string } } }
+
   /auth/register:
     post:
       summary: Create an account

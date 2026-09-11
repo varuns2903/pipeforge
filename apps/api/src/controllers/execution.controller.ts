@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { pipelineService } from '../services/pipeline.service';
 import { queueService } from '../services/queue.service';
 import { getConcurrentExecutionLimit } from '../services/quota.service';
+import { pipelineExecutionsTotal } from '../metrics';
 
 export const executionController = {
   async listExecutions(req: AuthRequest, res: Response) {
@@ -87,6 +88,7 @@ export const executionController = {
         webhook: pipeline.webhook,
         ...original.pipelineSnapshot
       });
+      pipelineExecutionsTotal.inc({ trigger: 'retry' });
 
       res.status(202).json({ id: retry._id.toString(), status: retry.status });
     } catch (err: any) {

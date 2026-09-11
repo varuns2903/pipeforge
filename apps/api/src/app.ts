@@ -17,6 +17,7 @@ import { connectionRouter } from './routes/connection.routes';
 import { usageRouter } from './routes/usage.routes';
 import { billingRouter } from './routes/billing.routes';
 import { billingController } from './controllers/billing.controller';
+import { registry, httpRequestDuration, httpRequestsTotal } from './metrics';
 
 export { logger };
 
@@ -26,6 +27,23 @@ app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/healthz
 // credentials: true is required for the browser to send/receive the httpOnly
 // auth cookie cross-origin; the frontend must set axios's withCredentials to match.
 app.use(cors({ origin: WEB_URL, credentials: true }));
+
+// Labels by the matched route PATTERN (e.g. "/:projectId/pipelines/:pipelineId"),
+// not the raw URL — using raw URLs would blow up Prometheus's cardinality with
+// one time series per distinct id ever requested. `req.route` is only populated
+// once Express has matched a route, so this reads it in the 'finish' handler
+// rather than up front.
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const route = req.route ? `${req.baseUrl}${req.route.path}` : (res.statusCode === 404 ? '404' : req.path);
+    const labels = { method: req.method, route, status_code: String(res.statusCode) };
+    const durationSeconds = Number(process.hrtime.bigint() - start) / 1e9;
+    httpRequestDuration.observe(labels, durationSeconds);
+    httpRequestsTotal.inc(labels);
+  });
+  next();
+});
 
 // Mounted BEFORE express.json(): Stripe's webhook signature is computed over
 // the exact raw request bytes, so this route needs the unparsed Buffer body
@@ -37,6 +55,14 @@ app.use(cookieParser());
 
 app.get('/healthz', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Standard Prometheus scrape target — intentionally unauthenticated (a
+// scraper can't carry a user session), same as most Prometheus exporters;
+// keep it off any public ingress if that matters for your deployment.
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', registry.contentType);
+  res.end(await registry.metrics());
 });
 
 // Same relative path from both src/app.ts (dev, via tsx) and dist/app.js

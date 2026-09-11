@@ -49,6 +49,14 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional()
     .refine(v => !v || v.startsWith('whsec_'), 'must be a Stripe webhook signing secret (starts "whsec_")'),
   STRIPE_PRICE_ID_PRO: z.string().startsWith('price_', 'must be a Stripe Price id (starts "price_"), not a Product id'),
+
+  // Observability — both optional, off by default so the app runs with zero
+  // extra infra in dev. Set OTEL_EXPORTER_OTLP_ENDPOINT (e.g.
+  // http://localhost:4318, an OTLP/HTTP collector like Jaeger or an
+  // OTel Collector) to enable distributed tracing; see tracing.ts, which
+  // must run before express/mongoose are first imported to instrument them.
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
+  OTEL_SERVICE_NAME: z.string().min(1).default('pipeforge-api'),
 });
 
 const env = loadEnv(schema);
@@ -84,3 +92,6 @@ export const STRIPE_SECRET_KEY = env.STRIPE_SECRET_KEY;
 // to undefined, so callers can use a plain truthiness check.
 export const STRIPE_WEBHOOK_SECRET = env.STRIPE_WEBHOOK_SECRET || undefined;
 export const STRIPE_PRICE_ID_PRO = env.STRIPE_PRICE_ID_PRO;
+
+export const OTEL_EXPORTER_OTLP_ENDPOINT = env.OTEL_EXPORTER_OTLP_ENDPOINT;
+export const OTEL_SERVICE_NAME = env.OTEL_SERVICE_NAME;

@@ -5,6 +5,7 @@ import { PipelineValidator } from '@pipeforge/pipeline-engine';
 import { Execution } from '../models/Execution';
 import { queueService } from '../services/queue.service';
 import { getConcurrentExecutionLimit } from '../services/quota.service';
+import { pipelineExecutionsTotal } from '../metrics';
 
 const mapToDTO = (doc: any) => ({
   id: doc._id.toString(),
@@ -224,6 +225,7 @@ export class PipelineController {
 
       // Queue the job
       await queueService.queueExecution(execution._id.toString(), pipeline);
+      pipelineExecutionsTotal.inc({ trigger: 'manual' });
 
       res.status(202).json({
         id: execution._id.toString(),

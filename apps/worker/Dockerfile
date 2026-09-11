@@ -32,5 +32,7 @@ COPY --from=build /repo/packages/shared/dist packages/shared/dist
 COPY --from=build /repo/packages/pipeline-engine/package.json packages/pipeline-engine/package.json
 COPY --from=build /repo/packages/pipeline-engine/dist packages/pipeline-engine/dist
 
-# No exposed port / HTTP healthcheck: this is a queue consumer, not a server.
+# Not a request-serving HTTP server — this port only serves /metrics for
+# Prometheus scraping (see src/metrics.ts).
+EXPOSE 9091
 CMD ["node", "apps/worker/dist/index.js"]

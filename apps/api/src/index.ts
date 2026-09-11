@@ -1,4 +1,5 @@
 import './config/env'; // must load first: populates process.env before other modules read it
+import './tracing'; // must load before app.ts (or anything it imports) to instrument express/mongoose
 
 import mongoose from 'mongoose';
 import { app, logger } from './app';

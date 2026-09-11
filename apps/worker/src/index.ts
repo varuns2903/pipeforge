@@ -1,3 +1,5 @@
+import './tracing'; // must load before mongoose/ioredis are first imported to instrument them
+
 import { Worker } from 'bullmq';
 import mongoose from 'mongoose';
 import Redis from 'ioredis';
@@ -9,6 +11,7 @@ import { isFinalAttempt } from './jobAttempts';
 import { shouldNotify } from './notificationGate';
 import { shouldDeliverWebhook } from './webhookGate';
 import { signWebhookPayload } from './webhookSignature';
+import { executionsTotal, executionDuration, startMetricsServer } from './metrics';
 
 const {
   MONGODB_URI,
@@ -102,14 +105,18 @@ async function startWorker() {
   await mongoose.connect(MONGODB_URI);
   logger.info('Worker connected to MongoDB');
 
+  const metricsServer = startMetricsServer();
+
   const engine = new PipelineEngine();
 
-  const runPipeline = async (job: { id?: string; attemptsMade: number; opts: { attempts?: number } }, executionId: string, pipeline: any) => {
+  const runPipeline = async (job: { id?: string; name?: string; attemptsMade: number; opts: { attempts?: number } }, executionId: string, pipeline: any) => {
     const jobId = job.id;
     // BullMQ retries a failed job up to opts.attempts times before giving
     // up; only notify once it's truly done (the last attempt), not on every
     // transient retry in between.
     const isFinal = isFinalAttempt(job);
+    const trigger = job.name || 'unknown';
+    const startedAt = process.hrtime.bigint();
     logger.info({ jobId, executionId }, 'Processing execution');
 
     await Execution.findByIdAndUpdate(executionId, {
@@ -152,12 +159,19 @@ async function startWorker() {
 
       publishUpdate({ type: 'STATUS', status: 'COMPLETED', results });
       logger.info({ jobId, executionId }, 'Execution completed successfully');
+      executionsTotal.inc({ trigger, status: 'completed' });
+      executionDuration.observe({ status: 'completed' }, Number(process.hrtime.bigint() - startedAt) / 1e9);
       if (updated) {
         await notifyOwner(pipeline, updated.ownerId.toString(), executionId, 'COMPLETED');
         await deliverWebhook(pipeline, executionId, 'COMPLETED');
       }
     } catch (error: any) {
       logger.error({ jobId, executionId, err: error }, 'Execution failed');
+      // Recorded on every attempt, not just the final one — a transient
+      // failure that BullMQ retries is still a real failed attempt worth
+      // counting, distinct from isFinal's "should we notify the owner yet".
+      executionsTotal.inc({ trigger, status: 'failed' });
+      executionDuration.observe({ status: 'failed' }, Number(process.hrtime.bigint() - startedAt) / 1e9);
       const updated = await Execution.findByIdAndUpdate(executionId, {
         status: 'FAILED',
         completedAt: new Date(),
@@ -224,6 +238,7 @@ async function startWorker() {
     try {
       await worker.close(); // stops accepting new jobs, waits for active ones to finish
       await redisPublisher.quit();
+      await new Promise<void>((resolve) => metricsServer.close(() => resolve()));
       await mongoose.disconnect();
       logger.info('Worker shut down cleanly');
       process.exit(0);

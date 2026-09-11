@@ -24,6 +24,16 @@ const schema = z.object({
   SMTP_USER: z.string().min(1).optional(),
   SMTP_PASS: z.string().min(1).optional(),
   MAIL_FROM: z.string().min(1).default('PipeForge <no-reply@pipeforge.local>'),
+
+  // Observability — both optional, off by default. Set
+  // OTEL_EXPORTER_OTLP_ENDPOINT (e.g. http://localhost:4318, an OTLP/HTTP
+  // collector like Jaeger) to enable distributed tracing; see tracing.ts,
+  // which must run before mongoose/ioredis are first imported to instrument
+  // them. METRICS_PORT serves Prometheus metrics (see metrics.ts) — this
+  // process has no other HTTP server, so it gets its own tiny one.
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
+  OTEL_SERVICE_NAME: z.string().min(1).default('pipeforge-worker'),
+  METRICS_PORT: z.coerce.number().int().positive().default(9091),
 });
 
 export const env = loadEnv(schema);
