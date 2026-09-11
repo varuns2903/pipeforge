@@ -6,6 +6,16 @@ info:
     REST API for PipeForge — a visual data-processing pipeline builder.
     Browser clients authenticate via an httpOnly cookie set on login/register;
     non-browser clients may instead send `Authorization: Bearer <token>`.
+
+
+    Rate limiting: every route under /api (except /api/billing/webhook, which
+    Stripe calls directly) is subject to a baseline per-IP limit of 600
+    requests per 15 minutes. Login/register have their own much stricter
+    per-IP limit (20/15min). A few endpoints that trigger real downstream
+    work — running a pipeline, retrying an execution, creating a Stripe
+    checkout/portal session — additionally enforce a per-*user* limit of 30
+    requests/minute. Any of these return 429 with `{ "error": "..." }` and
+    standard `RateLimit-*` response headers.
 servers:
   - url: /api
 

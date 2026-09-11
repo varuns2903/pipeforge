@@ -6,6 +6,7 @@ import { executionController } from '../controllers/execution.controller';
 import { connectionController } from '../controllers/connection.controller';
 import { fileRouter } from './file.routes';
 import { requireAuth } from '../middleware/auth.middleware';
+import { actionLimiter } from '../middleware/rateLimit';
 import { validationResult } from 'express-validator';
 
 export const projectRouter = Router();
@@ -48,10 +49,13 @@ projectRouter.get('/:projectId/pipelines', pipelineController.list);
 projectRouter.get('/:projectId/pipelines/trash', pipelineController.listTrashed);
 projectRouter.get('/:projectId/pipelines/:pipelineId', pipelineController.get);
 projectRouter.get('/:projectId/pipelines/:pipelineId/validate', pipelineController.validate);
-projectRouter.post('/:projectId/pipelines/:pipelineId/run', pipelineController.run);
+// Rate-limited per-user on top of the concurrent-execution quota check
+// inside each handler — the quota check itself still costs a DB round trip
+// per request, so this caps how many of those a burst can generate.
+projectRouter.post('/:projectId/pipelines/:pipelineId/run', actionLimiter, pipelineController.run);
 projectRouter.get('/:projectId/pipelines/:pipelineId/executions', executionController.listExecutions);
 projectRouter.get('/:projectId/pipelines/:pipelineId/executions/:executionId', executionController.getExecution);
-projectRouter.post('/:projectId/pipelines/:pipelineId/executions/:executionId/retry', executionController.retryExecution);
+projectRouter.post('/:projectId/pipelines/:pipelineId/executions/:executionId/retry', actionLimiter, executionController.retryExecution);
 projectRouter.put('/:projectId/pipelines/:pipelineId', pipelineController.update);
 projectRouter.delete('/:projectId/pipelines/:pipelineId', pipelineController.delete);
 projectRouter.post('/:projectId/pipelines/:pipelineId/restore', pipelineController.restore);

@@ -18,6 +18,7 @@ import { myExecutionsRouter } from './routes/myExecutions.routes';
 import { billingRouter } from './routes/billing.routes';
 import { billingController } from './controllers/billing.controller';
 import { registry, httpRequestDuration, httpRequestsTotal } from './metrics';
+import { apiLimiter } from './middleware/rateLimit';
 
 export { logger };
 
@@ -52,6 +53,12 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), bill
 
 app.use(express.json());
 app.use(cookieParser());
+
+// Applies to every /api/* route registered below — deliberately excludes
+// the webhook route above, which is registered (and fully handled) before
+// this middleware even runs, so Stripe's own delivery/retry behavior is
+// never subject to it.
+app.use('/api', apiLimiter);
 
 app.get('/healthz', (req, res) => {
   res.json({ status: 'ok' });
