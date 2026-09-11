@@ -491,7 +491,67 @@ export class PipelineEngine {
         return input.map(row => ({ ...row, [config.column]: cast(row[config.column]) }));
       }
 
+      case 'union':
+        // Every node type except `join` already treats its incoming edges as
+        // one flattened dataset (see `input` above) — this node exists to
+        // make "combine two same-shaped datasets" a discoverable, clearly
+        // labeled operation instead of an incidental side effect of wiring
+        // two edges into some other transform node.
+        return input;
+
+      case 'window': {
+        if (!config.orderBy) return input;
+        const partitionCols = (config.partitionBy || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+        const orderCol = config.orderBy;
+        const orderDir = config.order === 'desc' ? -1 : 1;
+        const rankType = config.rankType || 'row_number';
+        const outputColumn = config.outputColumn || 'rank';
+
+        const compareRows = (a: any, b: any) => {
+          const valA = a[orderCol];
+          const valB = b[orderCol];
+          const numA = Number(valA);
+          const numB = Number(valB);
+          if (!isNaN(numA) && !isNaN(numB) && valA !== null && valA !== '' && valB !== null && valB !== '') {
+            return (numA - numB) * orderDir;
+          }
+          return String(valA ?? '').localeCompare(String(valB ?? '')) * orderDir;
+        };
+
+        // Partition (or one group for everything, if no partitionBy) while
+        // preserving each row's position for a stable final row order.
+        const partitions = new Map<string, { row: any; index: number }[]>();
+        input.forEach((row, index) => {
+          const key = partitionCols.map((col: string) => String(row[col])).join('|');
+          if (!partitions.has(key)) partitions.set(key, []);
+          partitions.get(key)!.push({ row, index });
+        });
+
+        const ranked: { row: any; index: number }[] = [];
+        for (const entries of partitions.values()) {
+          entries.sort((a, b) => compareRows(a.row, b.row));
+          let rank = 0;
+          let previousKey: string | null = null;
+          entries.forEach((entry, position) => {
+            const currentKey = String(entry.row[orderCol]);
+            if (rankType === 'row_number') {
+              rank = position + 1;
+            } else if (currentKey !== previousKey) {
+              // 'rank': ties share a rank, next distinct value jumps by the
+              // number of tied rows (SQL RANK() semantics). 'dense_rank':
+              // ties share a rank, next distinct value is always +1.
+              rank = rankType === 'dense_rank' ? rank + 1 : position + 1;
+            }
+            previousKey = currentKey;
+            ranked.push({ row: { ...entry.row, [outputColumn]: rank }, index: entry.index });
+          });
+        }
+
+        return ranked.sort((a, b) => a.index - b.index).map(entry => entry.row);
+      }
+
       case 'csv-output':
+      case 'json-output':
         return input;
 
       default:

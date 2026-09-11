@@ -50,6 +50,11 @@ export class PipelineValidator {
         result.isValid = false;
       }
 
+      if (type === 'window' && !config.orderBy) {
+        result.errors.push(`Node '${node.data.label}' (window) requires an orderBy column.`);
+        result.isValid = false;
+      }
+
       if ((type === 'fill-nulls' || type === 'cast-type') && !config.column) {
         result.errors.push(`Node '${node.data.label}' (${type}) requires a column.`);
         result.isValid = false;
@@ -159,6 +164,11 @@ export class PipelineValidator {
 
       if (type === 'join' && nin !== 2) {
         result.errors.push(`Node '${node.data.label}' (join) requires exactly 2 incoming connections (left and right), found ${nin}.`);
+        result.isValid = false;
+      }
+
+      if (type === 'union' && nin < 2) {
+        result.errors.push(`Node '${node.data.label}' (union) requires at least 2 incoming connections, found ${nin}.`);
         result.isValid = false;
       }
     });

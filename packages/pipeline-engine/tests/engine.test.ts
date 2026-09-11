@@ -140,4 +140,69 @@ describe('PipelineEngine', () => {
     const us = result['2']!.find((r: any) => r.country === 'US');
     expect(us.min_age).toBe(15); // David (15) < Alice (28), both US
   });
+
+  it('union concatenates rows from multiple incoming edges', async () => {
+    // Split the 4-row mock dataset into two filtered streams, then union
+    // them back together — should recombine to all 4 rows.
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: 'mock' } } },
+        { id: '2', data: { nodeType: 'filter', label: 'Adults', config: { condition: 'row.age >= 18' } } },
+        { id: '3', data: { nodeType: 'filter', label: 'Minors', config: { condition: 'row.age < 18' } } },
+        { id: '4', data: { nodeType: 'union', label: 'Union', config: {} } },
+      ],
+      edges: [
+        { source: '1', target: '2' },
+        { source: '1', target: '3' },
+        { source: '2', target: '4' },
+        { source: '3', target: '4' },
+      ]
+    };
+    const result = await engine.execute(pipeline);
+    expect(result['4']!.length).toBe(4);
+    expect(result['4']!.map((r: any) => r.name).sort()).toEqual(['Alice', 'Bob', 'Charlie', 'David']);
+  });
+
+  describe('window', () => {
+    it('row_number assigns a unique sequential rank per partition, ordered by a column', async () => {
+      const pipeline = {
+        nodes: [
+          { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: 'mock' } } },
+          { id: '2', data: { nodeType: 'window', label: 'Window', config: { partitionBy: 'country', orderBy: 'age', order: 'desc', rankType: 'row_number' } } },
+        ],
+        edges: [{ source: '1', target: '2' }]
+      };
+      const result = await engine.execute(pipeline);
+      // US: Alice(28), David(15) -> ranks 1,2 by age desc. UK: Bob(17) -> rank 1. CA: Charlie(34) -> rank 1.
+      const byName = Object.fromEntries(result['2']!.map((r: any) => [r.name, r.rank]));
+      expect(byName).toEqual({ Alice: 1, David: 2, Bob: 1, Charlie: 1 });
+    });
+
+    it('rank leaves gaps after ties; dense_rank does not', async () => {
+      // Union the 4-row mock dataset with itself to create genuine ties:
+      // 2x CA, 2x UK, 4x US when ordered by country (no partitionBy).
+      const buildPipeline = (rankType: string) => ({
+        nodes: [
+          { id: '1', data: { nodeType: 'csv-input', label: 'Input', config: { filePath: 'mock' } } },
+          { id: '2', data: { nodeType: 'union', label: 'Union', config: {} } },
+          { id: '3', data: { nodeType: 'window', label: 'Window', config: { orderBy: 'country', rankType } } },
+        ],
+        edges: [
+          { source: '1', target: '2' },
+          { source: '1', target: '2' },
+          { source: '2', target: '3' },
+        ]
+      });
+
+      const rankResult = await engine.execute(buildPipeline('rank'));
+      const rankValues = rankResult['3']!.map((r: any) => r.rank).sort((a: number, b: number) => a - b);
+      // CA(x2)->1,1  UK(x2)->3,3  US(x4)->5,5,5,5 : rank skips 2 and 4 after each tie.
+      expect(rankValues).toEqual([1, 1, 3, 3, 5, 5, 5, 5]);
+
+      const denseResult = await engine.execute(buildPipeline('dense_rank'));
+      const denseValues = denseResult['3']!.map((r: any) => r.rank).sort((a: number, b: number) => a - b);
+      // CA(x2)->1,1  UK(x2)->2,2  US(x4)->3,3,3,3 : dense_rank never skips.
+      expect(denseValues).toEqual([1, 1, 2, 2, 3, 3, 3, 3]);
+    });
+  });
 });

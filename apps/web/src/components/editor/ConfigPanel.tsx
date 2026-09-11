@@ -506,6 +506,73 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { s
             </div>
           )}
 
+          {/* UNION */}
+          {selectedNode.data.nodeType === 'union' && (
+            <div className="p-3 bg-accent-500/10 border border-accent-500/20 rounded-lg text-xs text-text-secondary">
+              Connect two or more inputs to this node — their rows are concatenated together (same-shaped datasets in, one combined dataset out). No configuration needed.
+            </div>
+          )}
+
+          {/* WINDOW */}
+          {selectedNode.data.nodeType === 'window' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Partition By <span className="normal-case text-text-tertiary">(optional)</span></label>
+                <input
+                  type="text"
+                  value={config.partitionBy || ''}
+                  onChange={(e) => updateConfig({ partitionBy: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="e.g. country"
+                />
+                <p className="text-xs text-text-tertiary mt-2">Comma separated columns. Ranking restarts within each group; leave blank to rank across all rows.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Order By Column</label>
+                <input
+                  type="text"
+                  value={config.orderBy || ''}
+                  onChange={(e) => updateConfig({ orderBy: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="e.g. age"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Order</label>
+                <select
+                  value={config.order || 'asc'}
+                  onChange={(e) => updateConfig({ order: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="asc">Ascending (A-Z, 0-9)</option>
+                  <option value="desc">Descending (Z-A, 9-0)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Rank Type</label>
+                <select
+                  value={config.rankType || 'row_number'}
+                  onChange={(e) => updateConfig({ rankType: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="row_number">Row Number (always unique)</option>
+                  <option value="rank">Rank (ties share a rank, gaps after)</option>
+                  <option value="dense_rank">Dense Rank (ties share a rank, no gaps)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Output Column <span className="normal-case text-text-tertiary">(optional)</span></label>
+                <input
+                  type="text"
+                  value={config.outputColumn || ''}
+                  onChange={(e) => updateConfig({ outputColumn: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="rank"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="pt-6 border-t border-border-subtle">
             <h4 className="text-xs font-medium text-text-secondary mb-2 uppercase tracking-wider">Internal Metadata</h4>
             <div className="bg-surface-2 p-3 rounded-md border border-border-subtle font-mono text-[11px] text-text-tertiary overflow-x-auto">
