@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Settings2, Trash2, Upload, X } from 'lucide-react';
 import { Database } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useUpstreamColumns } from './useUpstreamColumns';
 
 interface Connection {
   id: string;
@@ -10,7 +11,7 @@ interface Connection {
   type: 'postgres' | 'mysql' | 's3' | 'api';
 }
 
-export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBeforeDelete }: { selectedNode: any, setNodes: any, setEdges: any, projectId: string, onBeforeDelete?: () => void }) {
+export function ConfigPanel({ selectedNode, setNodes, setEdges, edges, projectId, onBeforeDelete }: { selectedNode: any, setNodes: any, setEdges: any, edges: any[], projectId: string, onBeforeDelete?: () => void }) {
   const [config, setConfig] = useState<any>({});
   const [uploading, setUploading] = useState(false);
 
@@ -26,6 +27,12 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
     queryFn: async () => (await api.get(`/projects/${projectId}/connections`)).data,
     enabled: isConnectorNode,
   });
+
+  // Best-effort column-name suggestions for this node, from the pipeline's
+  // most recent completed run — see useUpstreamColumns for the "before the
+  // first run" fallback. `list="pf-column-suggestions"` on a text input
+  // turns it into a native autocomplete without needing a custom dropdown.
+  const upstreamColumns = useUpstreamColumns(selectedNode?.id, edges, projectId);
 
   if (!selectedNode) {
     return null;
@@ -153,6 +160,9 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                 placeholder="row.age > 18"
               />
               <p className="text-xs text-text-tertiary mt-2">Use valid JavaScript expression returning boolean. (Numbers are auto-cast!)</p>
+              {upstreamColumns.length > 0 && (
+                <p className="text-xs text-text-tertiary mt-1">Columns: <span className="font-mono text-text-secondary">{upstreamColumns.join(', ')}</span></p>
+              )}
             </div>
           )}
 
@@ -168,6 +178,9 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                 placeholder="row.age > 18"
               />
               <p className="text-xs text-text-tertiary mt-2">Every row is kept — matching rows go out the <span className="text-status-success">true</span> connection, everything else goes out the <span className="text-status-error">false</span> connection. Connect each one to a different downstream node.</p>
+              {upstreamColumns.length > 0 && (
+                <p className="text-xs text-text-tertiary mt-1">Columns: <span className="font-mono text-text-secondary">{upstreamColumns.join(', ')}</span></p>
+              )}
             </div>
           )}
 
@@ -415,6 +428,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                 type="text"
                 value={config.columns || ''}
                 onChange={(e) => updateConfig({ columns: e.target.value })}
+                list="pf-column-suggestions"
                 className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
                 placeholder="name, age, country"
               />
@@ -431,6 +445,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                   type="text"
                   value={config.sortBy || ''}
                   onChange={(e) => updateConfig({ sortBy: e.target.value })}
+                  list="pf-column-suggestions"
                   className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
                   placeholder="e.g. age"
                 />
@@ -458,6 +473,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                 type="text"
                 value={config.columns || ''}
                 onChange={(e) => updateConfig({ columns: e.target.value })}
+                list="pf-column-suggestions"
                 className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
                 placeholder="email, username"
               />
@@ -474,6 +490,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                   type="text"
                   value={config.groupBy || ''}
                   onChange={(e) => updateConfig({ groupBy: e.target.value })}
+                  list="pf-column-suggestions"
                   className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
                   placeholder="e.g. country, active"
                 />
@@ -502,6 +519,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                     type="text"
                     value={config.targetColumn || ''}
                     onChange={(e) => updateConfig({ targetColumn: e.target.value })}
+                    list="pf-column-suggestions"
                     className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
                     placeholder="e.g. revenue"
                   />
@@ -537,6 +555,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                   type="text"
                   value={config.column || ''}
                   onChange={(e) => updateConfig({ column: e.target.value })}
+                  list="pf-column-suggestions"
                   className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
                   placeholder="e.g. country"
                 />
@@ -564,6 +583,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                   type="text"
                   value={config.column || ''}
                   onChange={(e) => updateConfig({ column: e.target.value })}
+                  list="pf-column-suggestions"
                   className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
                   placeholder="e.g. age"
                 />
@@ -639,6 +659,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                   type="text"
                   value={config.partitionBy || ''}
                   onChange={(e) => updateConfig({ partitionBy: e.target.value })}
+                  list="pf-column-suggestions"
                   className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
                   placeholder="e.g. country"
                 />
@@ -650,6 +671,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
                   type="text"
                   value={config.orderBy || ''}
                   onChange={(e) => updateConfig({ orderBy: e.target.value })}
+                  list="pf-column-suggestions"
                   className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
                   placeholder="e.g. age"
                 />
@@ -700,6 +722,9 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId, onBef
           </div>
         </div>
       </div>
+      <datalist id="pf-column-suggestions">
+        {upstreamColumns.map(col => <option key={col} value={col} />)}
+      </datalist>
     </aside>
   );
 }

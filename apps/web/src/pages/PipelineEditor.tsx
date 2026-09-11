@@ -352,7 +352,7 @@ function EditorCanvas() {
             />
           </ReactFlow>
         </div>
-        <ConfigPanel selectedNode={selectedNode} setNodes={setNodes} setEdges={setEdges} projectId={projectId!} onBeforeDelete={pushHistory} />
+        <ConfigPanel selectedNode={selectedNode} setNodes={setNodes} setEdges={setEdges} edges={edges} projectId={projectId!} onBeforeDelete={pushHistory} />
         {isDrawerOpen && <ExecutionDrawer pipelineId={pipelineId!} onClose={() => setIsDrawerOpen(false)} />}
         {isHistoryOpen && <HistoryModal onClose={() => setIsHistoryOpen(false)} />}
         {isScheduleOpen && (
