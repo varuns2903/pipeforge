@@ -31,6 +31,7 @@ const NODE_TYPES = [
   { category: 'Output', items: [
     { type: 'csv-output', label: 'Export CSV', icon: FileOutput },
     { type: 'json-output', label: 'Export JSON', icon: FileJson },
+    { type: 'excel-output', label: 'Export Excel', icon: FileSpreadsheet },
   ]}
 ];
 

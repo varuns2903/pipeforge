@@ -671,6 +671,7 @@ export class PipelineEngine {
 
       case 'csv-output':
       case 'json-output':
+      case 'excel-output':
         return input;
 
       default:

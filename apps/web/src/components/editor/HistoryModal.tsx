@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tansta
 import { api } from '../../lib/api';
 import { X, Clock, CheckCircle, AlertTriangle, Download, Settings, RotateCcw } from 'lucide-react';
 import { useParams } from 'react-router-dom';
+import ExcelJS from 'exceljs';
 
 export function HistoryModal({ onClose }: { onClose: () => void }) {
   const { projectId, pipelineId } = useParams<{ projectId: string, pipelineId: string }>();
@@ -101,14 +102,34 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
     return lines.join('\n');
   };
 
-  const downloadOutput = (run: any) => {
-    const data = getFinalOutput(run.results);
-    const isCsv = getFinalOutputNodeType(run) === 'csv-output';
-    const content = isCsv ? toCsv(data) : JSON.stringify(data, null, 2);
-    const mime = isCsv ? 'text/csv' : 'application/json';
-    const ext = isCsv ? 'csv' : 'json';
+  const toExcelBlob = async (rows: any[]): Promise<Blob> => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Data');
+    if (rows.length > 0) {
+      sheet.columns = Object.keys(rows[0]).map(key => ({ header: key, key }));
+      sheet.addRows(rows);
+    }
+    const buffer = await workbook.xlsx.writeBuffer();
+    return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  };
 
-    const blob = new Blob([content], { type: mime });
+  const downloadOutput = async (run: any) => {
+    const data = getFinalOutput(run.results) || [];
+    const nodeType = getFinalOutputNodeType(run);
+
+    let blob: Blob;
+    let ext: string;
+    if (nodeType === 'csv-output') {
+      blob = new Blob([toCsv(data)], { type: 'text/csv' });
+      ext = 'csv';
+    } else if (nodeType === 'excel-output') {
+      blob = await toExcelBlob(data);
+      ext = 'xlsx';
+    } else {
+      blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      ext = 'json';
+    }
+
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -238,7 +259,11 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
                         onClick={() => downloadOutput(runDetail)}
                         className="text-xs flex items-center gap-1.5 text-accent-500 hover:text-accent-400 bg-accent-500/10 px-3 py-1.5 rounded"
                       >
-                        <Download size={14} /> {getFinalOutputNodeType(runDetail) === 'csv-output' ? 'Export CSV' : 'Export JSON'}
+                        <Download size={14} /> {
+                          getFinalOutputNodeType(runDetail) === 'csv-output' ? 'Export CSV'
+                            : getFinalOutputNodeType(runDetail) === 'excel-output' ? 'Export Excel'
+                              : 'Export JSON'
+                        }
                       </button>
                     </div>
                     
