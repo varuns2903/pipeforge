@@ -1,6 +1,6 @@
 import './tracing'; // must load before mongoose/ioredis are first imported to instrument them
 
-import { Worker } from 'bullmq';
+import { Worker, Queue } from 'bullmq';
 import mongoose from 'mongoose';
 import Redis from 'ioredis';
 import { PipelineEngine, PipelineValidator } from '@pipeforge/pipeline-engine';
@@ -12,6 +12,7 @@ import { shouldNotify } from './notificationGate';
 import { shouldDeliverWebhook } from './webhookGate';
 import { signWebhookPayload } from './webhookSignature';
 import { executionsTotal, executionDuration, startMetricsServer } from './metrics';
+import { runRetentionSweep } from './retention';
 
 const {
   MONGODB_URI,
@@ -20,7 +21,15 @@ const {
   WORKER_CONCURRENCY,
   WEB_URL,
   CONNECTION_ENCRYPTION_KEY,
+  EXECUTION_RETENTION_DAYS,
+  FILE_RETENTION_DAYS,
+  RETENTION_CRON,
 } = env;
+
+// Fixed, non-ObjectId scheduler id on the same queue pipeline executions
+// use — scheduleRecurring's scheduler ids are always pipeline ids (24-hex
+// ObjectIds), so this can never collide with one.
+const RETENTION_JOB_SCHEDULER_ID = 'data-retention';
 
 const redisPublisher = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
 
@@ -187,7 +196,26 @@ async function startWorker() {
     }
   };
 
+  const retentionQueue = new Queue('pipeline-executions', {
+    connection: { host: REDIS_HOST, port: REDIS_PORT }
+  });
+  await retentionQueue.upsertJobScheduler(
+    RETENTION_JOB_SCHEDULER_ID,
+    { pattern: RETENTION_CRON },
+    { name: 'data-retention', data: {} }
+  );
+  await retentionQueue.close();
+
   const worker = new Worker('pipeline-executions', async job => {
+    if (job.name === 'data-retention') {
+      await runRetentionSweep({
+        executionModel: Execution,
+        executionRetentionDays: EXECUTION_RETENTION_DAYS,
+        fileRetentionDays: FILE_RETENTION_DAYS,
+      });
+      return;
+    }
+
     if (job.name === 'scheduled-execution') {
       // A cron schedule fired — unlike a manual run, there's no HTTP request
       // that already created the Execution record, so do that here. Fetch

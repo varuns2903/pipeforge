@@ -34,6 +34,15 @@ const schema = z.object({
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   OTEL_SERVICE_NAME: z.string().min(1).default('pipeforge-worker'),
   METRICS_PORT: z.coerce.number().int().positive().default(9091),
+
+  // Data retention: a recurring job (see retention.ts) deletes finished
+  // executions and uploaded files past these ages, on RETENTION_CRON's
+  // schedule. Generous defaults — this is storage hygiene, not an
+  // aggressive cleanup — and running executions/pipelines/connections are
+  // never touched regardless of age.
+  EXECUTION_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  FILE_RETENTION_DAYS: z.coerce.number().int().positive().default(180),
+  RETENTION_CRON: z.string().min(1).default('0 3 * * *'),
 });
 
 export const env = loadEnv(schema);
