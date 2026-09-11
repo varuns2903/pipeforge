@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Settings2, Trash2, Upload, X } from 'lucide-react';
+import { Settings2, Trash2, Upload, X, Eye, Loader2 } from 'lucide-react';
 import { Database } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useUpstreamColumns } from './useUpstreamColumns';
@@ -11,15 +12,38 @@ interface Connection {
   type: 'postgres' | 'mysql' | 's3' | 'api';
 }
 
-export function ConfigPanel({ selectedNode, setNodes, setEdges, edges, projectId, onBeforeDelete }: { selectedNode: any, setNodes: any, setEdges: any, edges: any[], projectId: string, onBeforeDelete?: () => void }) {
+interface PreviewState {
+  loading: boolean;
+  rows: any[];
+  totalRows: number;
+  truncated: boolean;
+  error: string | null;
+}
+
+export function ConfigPanel({ selectedNode, nodes, edges, setNodes, setEdges, projectId, onBeforeDelete }: { selectedNode: any, nodes: any[], edges: any[], setNodes: any, setEdges: any, projectId: string, onBeforeDelete?: () => void }) {
+  const { pipelineId } = useParams<{ pipelineId: string }>();
   const [config, setConfig] = useState<any>({});
   const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
 
   useEffect(() => {
     if (selectedNode) {
       setConfig(selectedNode.data.config || {});
+      setPreview(null);
     }
   }, [selectedNode]);
+
+  const runPreview = async () => {
+    setPreview({ loading: true, rows: [], totalRows: 0, truncated: false, error: null });
+    try {
+      const res = await api.post(`/projects/${projectId}/pipelines/${pipelineId}/preview`, {
+        nodes, edges, targetNodeId: selectedNode.id,
+      });
+      setPreview({ loading: false, error: null, ...res.data });
+    } catch (err: any) {
+      setPreview({ loading: false, rows: [], totalRows: 0, truncated: false, error: err.response?.data?.error || 'Preview failed' });
+    }
+  };
 
   const isConnectorNode = ['postgres-input', 'mysql-input', 's3-input', 'api-input'].includes(selectedNode?.data?.nodeType);
   const { data: connections } = useQuery<Connection[]>({
@@ -87,7 +111,57 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, edges, projectId
           <Trash2 size={16} />
         </button>
       </div>
-      
+
+      <div className="px-5 pt-4">
+        <button
+          onClick={runPreview}
+          disabled={preview?.loading}
+          className="w-full glass-button px-3 py-2 rounded-md flex items-center justify-center gap-2 text-sm text-text-secondary hover:text-text-primary disabled:opacity-60"
+        >
+          {preview?.loading ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+          {preview?.loading ? 'Running preview...' : 'Preview Data'}
+        </button>
+
+        {preview && !preview.loading && (
+          <div className="mt-3 rounded-lg border border-border-subtle overflow-hidden">
+            {preview.error ? (
+              <div className="p-3 bg-status-error/10 text-status-error text-xs">{preview.error}</div>
+            ) : preview.rows.length === 0 ? (
+              <div className="p-3 text-xs text-text-tertiary">No rows.</div>
+            ) : (
+              <>
+                <div className="overflow-x-auto max-h-48">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead className="bg-surface-2 text-text-secondary sticky top-0">
+                      <tr>
+                        {Object.keys(preview.rows[0]).map(col => (
+                          <th key={col} className="px-2 py-1.5 font-medium border-b border-border-subtle">{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-subtle text-text-primary">
+                      {preview.rows.map((row, i) => (
+                        <tr key={i}>
+                          {Object.keys(preview.rows[0]).map(col => (
+                            <td key={col} className="px-2 py-1.5 font-mono text-text-secondary">
+                              {typeof row[col] === 'object' ? JSON.stringify(row[col]) : String(row[col])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-2 py-1.5 bg-surface-2 text-[10px] text-text-tertiary border-t border-border-subtle">
+                  Showing {preview.rows.length} of {preview.totalRows} row{preview.totalRows === 1 ? '' : 's'}
+                  {preview.truncated ? ' (truncated)' : ''}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="flex-1 overflow-y-auto p-5">
         <div className="space-y-5">
           {selectedNode.data.nodeType === 'csv-input' && (

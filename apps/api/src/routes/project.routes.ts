@@ -57,6 +57,7 @@ projectRouter.get('/:projectId/pipelines/:pipelineId/validate', pipelineControll
 // inside each handler — the quota check itself still costs a DB round trip
 // per request, so this caps how many of those a burst can generate.
 projectRouter.post('/:projectId/pipelines/:pipelineId/run', actionLimiter, pipelineController.run);
+projectRouter.post('/:projectId/pipelines/:pipelineId/preview', actionLimiter, pipelineController.preview);
 projectRouter.get('/:projectId/pipelines/:pipelineId/executions', executionController.listExecutions);
 projectRouter.get('/:projectId/pipelines/:pipelineId/executions/:executionId', executionController.getExecution);
 projectRouter.post('/:projectId/pipelines/:pipelineId/executions/:executionId/retry', actionLimiter, executionController.retryExecution);

@@ -682,6 +682,41 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { description: 'Too many active executions for this user (MAX_CONCURRENT_EXECUTIONS_PER_USER)' }
 
+  /projects/{projectId}/pipelines/{pipelineId}/preview:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: >-
+        Synchronously runs just the ancestor subgraph of one node from the
+        given (not necessarily saved) nodes/edges and returns up to 20 rows
+        of its output — for the editor's "peek at this node's data" preview,
+        not a tracked Execution.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nodes, edges, targetNodeId]
+              properties:
+                nodes: { type: array, items: { type: object } }
+                edges: { type: array, items: { type: object } }
+                targetNodeId: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows: { type: array, items: { type: object } }
+                  totalRows: { type: integer }
+                  truncated: { type: boolean }
+        '400': { description: 'Missing request fields, or the subgraph failed to run (bad config, missing connection, etc.)' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /projects/{projectId}/pipelines/{pipelineId}/executions:
     parameters:
       - { name: projectId, in: path, required: true, schema: { type: string } }

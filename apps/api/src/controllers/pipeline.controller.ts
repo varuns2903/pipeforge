@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { pipelineService } from '../services/pipeline.service';
 import { activityLogService } from '../services/activityLog.service';
+import { previewService } from '../services/preview.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { PipelineValidator } from '@pipeforge/pipeline-engine';
 import { Execution } from '../models/Execution';
@@ -251,6 +252,29 @@ export class PipelineController {
     } catch (err: any) {
       if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
       next(err);
+    }
+  }
+
+  // Runs just the ancestor subgraph of one node from the *in-editor*, not
+  // necessarily saved, nodes/edges — lets a user peek at a node's output
+  // while building without saving/running the whole pipeline first.
+  async preview(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { nodes, edges, targetNodeId } = req.body;
+      if (!Array.isArray(nodes) || !Array.isArray(edges) || !targetNodeId) {
+        return res.status(400).json({ error: 'nodes, edges, and targetNodeId are required' });
+      }
+      const result = await previewService.preview(
+        req.params.projectId as string, req.user.id, nodes, edges, targetNodeId
+      );
+      res.json(result);
+    } catch (err: any) {
+      if (err.message === 'Project not found') return res.status(404).json({ error: err.message });
+      // Anything else here is virtually always a resolvable pipeline-config
+      // problem (bad query, missing file, unset config field) surfaced by
+      // the engine itself, not a server bug — same spirit as `run`'s
+      // pre-flight validation returning 400 rather than 500.
+      res.status(400).json({ error: err.message });
     }
   }
 }
