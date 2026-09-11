@@ -78,7 +78,8 @@ describe('Execution ownership (IDOR protection)', () => {
       .set('Authorization', `Bearer ${tokenA}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.length).toBe(1);
+    expect(res.body.items.length).toBe(1);
+    expect(res.body.nextCursor).toBeNull();
   });
 
   it('allows the owner to read the execution by id', async () => {

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { PlayCircle, CheckCircle, AlertTriangle, Clock } from 'lucide-react';
@@ -24,10 +24,22 @@ function StatusBadge({ status }: { status: ExecutionSummary['status'] }) {
 }
 
 export function Executions() {
-  const { data: executions, isLoading } = useQuery<ExecutionSummary[]>({
+  const {
+    data: pages,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['my-executions'],
-    queryFn: async () => (await api.get('/executions')).data,
+    queryFn: async ({ pageParam }: { pageParam: string | null }) => {
+      const res = await api.get('/executions', { params: pageParam ? { cursor: pageParam } : {} });
+      return res.data as { items: ExecutionSummary[]; nextCursor: string | null };
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
+  const executions = pages?.pages.flatMap(p => p.items);
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -74,6 +86,15 @@ export function Executions() {
               </div>
             </Link>
           ))}
+          {hasNextPage && (
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="w-full glass-button py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary disabled:opacity-50"
+            >
+              {isFetchingNextPage ? 'Loading…' : 'Load more'}
+            </button>
+          )}
         </div>
       )}
     </div>

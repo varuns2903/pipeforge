@@ -5,21 +5,26 @@ import { pipelineService } from '../services/pipeline.service';
 import { queueService } from '../services/queue.service';
 import { getConcurrentExecutionLimit } from '../services/quota.service';
 import { pipelineExecutionsTotal } from '../metrics';
+import { parsePageParams, toPage } from '../utils/pagination';
 
 export const executionController = {
+  // Cursor-paginated: a pipeline on a tight schedule accumulates executions
+  // fast enough that a flat limit(50) would silently hide history within
+  // weeks. `_id` doubles as the cursor (see utils/pagination.ts).
   async listExecutions(req: AuthRequest, res: Response) {
     try {
       const { projectId, pipelineId } = req.params;
+      const { limit, cursor } = parsePageParams(req.query);
 
       // Verifies the requesting user owns the project/pipeline before exposing executions.
       await pipelineService.getById(pipelineId as string, projectId as string, req.user.id);
 
-      const executions = await Execution.find({ pipelineId })
-        .sort({ createdAt: -1 })
+      const executions = await Execution.find({ pipelineId, ...(cursor ? { _id: { $lt: cursor } } : {}) })
+        .sort({ _id: -1 })
         .select('-results') // don't send heavy results payload in list
-        .limit(50);
+        .limit(limit + 1);
 
-      res.json(executions);
+      res.json(toPage(executions, limit));
     } catch (err: any) {
       if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
       res.status(500).json({ error: err.message });

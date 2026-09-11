@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { X, Clock, CheckCircle, AlertTriangle, Download, Settings, RotateCcw } from 'lucide-react';
 import { useParams } from 'react-router-dom';
@@ -9,13 +9,24 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: runs, isLoading } = useQuery({
+  const {
+    data: runPages,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['executions', pipelineId],
-    queryFn: async () => {
-      const res = await api.get(`/projects/${projectId}/pipelines/${pipelineId}/executions`);
-      return res.data;
-    }
+    queryFn: async ({ pageParam }: { pageParam: string | null }) => {
+      const res = await api.get(`/projects/${projectId}/pipelines/${pipelineId}/executions`, {
+        params: pageParam ? { cursor: pageParam } : {},
+      });
+      return res.data as { items: any[]; nextCursor: string | null };
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
+  const runs = runPages?.pages.flatMap(p => p.items);
 
   const retryRun = useMutation({
     mutationFn: async (executionId: string) => {
@@ -149,6 +160,15 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
                     </li>
                   ))}
                 </ul>
+              )}
+              {hasNextPage && (
+                <button
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="w-full p-3 text-xs text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors disabled:opacity-50"
+                >
+                  {isFetchingNextPage ? 'Loading…' : 'Load more'}
+                </button>
               )}
             </div>
           </div>

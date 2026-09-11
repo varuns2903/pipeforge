@@ -43,14 +43,30 @@ describe('GET /api/executions', () => {
   it('lists only the current user\'s own executions, with pipeline/project names populated', async () => {
     const res = await request(app).get('/api/executions').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(2);
-    for (const execution of res.body) {
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.nextCursor).toBeNull();
+    for (const execution of res.body.items) {
       expect(execution.pipeline).toEqual({ id: pipelineId, name: 'Exec List Pipeline' });
       expect(execution.project).toEqual({ id: projectId, name: 'Exec List Project' });
       expect(execution.results).toBeUndefined();
       expect(execution.pipelineSnapshot).toBeUndefined();
     }
-    expect(res.body.map((e: any) => e.status).sort()).toEqual(['COMPLETED', 'FAILED']);
+    expect(res.body.items.map((e: any) => e.status).sort()).toEqual(['COMPLETED', 'FAILED']);
+  });
+
+  it('paginates with a cursor once there are more items than the page size', async () => {
+    const firstPage = await request(app).get('/api/executions?limit=1').set('Authorization', `Bearer ${token}`);
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body.items).toHaveLength(1);
+    expect(firstPage.body.nextCursor).not.toBeNull();
+
+    const secondPage = await request(app)
+      .get(`/api/executions?limit=1&cursor=${firstPage.body.nextCursor}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.body.items).toHaveLength(1);
+    expect(secondPage.body.items[0].id).not.toBe(firstPage.body.items[0].id);
+    expect(secondPage.body.nextCursor).toBeNull(); // exactly 2 total executions for this user
   });
 
   it('requires authentication', async () => {

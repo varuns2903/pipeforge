@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { Execution } from '../models/Execution';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { parsePageParams, toPage } from '../utils/pagination';
 import '../models/Pipeline'; // registers the 'Pipeline' model populate() below resolves against
 import '../models/Project'; // same, for 'Project'
 
@@ -26,14 +27,16 @@ export const myExecutionsController = {
   // also show teammates' runs; that's a separate activity-log concern.
   async list(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const executions = await Execution.find({ ownerId: req.user.id })
-        .sort({ createdAt: -1 })
-        .limit(100)
+      const { limit, cursor } = parsePageParams(req.query);
+      const executions = await Execution.find({ ownerId: req.user.id, ...(cursor ? { _id: { $lt: cursor } } : {}) })
+        .sort({ _id: -1 })
+        .limit(limit + 1)
         .select('-results -pipelineSnapshot') // heavy fields, not needed for a list view
         .populate('pipelineId', 'name')
         .populate('projectId', 'name');
 
-      res.json(executions.map(mapToDTO));
+      const { items, nextCursor } = toPage(executions, limit);
+      res.json({ items: items.map(mapToDTO), nextCursor });
     } catch (err) { next(err); }
   },
 };

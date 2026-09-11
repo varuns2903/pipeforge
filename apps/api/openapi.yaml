@@ -676,16 +676,20 @@ paths:
     parameters:
       - { name: projectId, in: path, required: true, schema: { type: string } }
       - { name: pipelineId, in: path, required: true, schema: { type: string } }
+      - { name: cursor, in: query, required: false, schema: { type: string }, description: "The previous page's nextCursor, to fetch the page after it. Omit for the first page." }
+      - { name: limit, in: query, required: false, schema: { type: integer, default: 50, maximum: 100 } }
     get:
-      summary: List recent executions of a pipeline (most recent 50, no results payload)
+      summary: Cursor-paginated list of a pipeline's executions, most recent first (no results payload)
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: '#/components/schemas/Execution' }
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Execution' } }
+                  nextCursor: { type: string, nullable: true, description: 'Pass as ?cursor= to fetch the next page; null when this was the last page.' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /projects/{projectId}/pipelines/{pipelineId}/executions/{executionId}:
@@ -793,8 +797,11 @@ paths:
                 items: { $ref: '#/components/schemas/FileSummary' }
 
   /executions:
+    parameters:
+      - { name: cursor, in: query, required: false, schema: { type: string }, description: "The previous page's nextCursor, to fetch the page after it. Omit for the first page." }
+      - { name: limit, in: query, required: false, schema: { type: integer, default: 50, maximum: 100 } }
     get:
-      summary: List every execution the current user has personally triggered, across all their projects
+      summary: Cursor-paginated list of every execution the current user has personally triggered, across all their projects
       description: Does not include executions run by teammates in a shared project — see the activity log for that.
       responses:
         '200':
@@ -802,8 +809,10 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: '#/components/schemas/ExecutionSummary' }
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/ExecutionSummary' } }
+                  nextCursor: { type: string, nullable: true, description: 'Pass as ?cursor= to fetch the next page; null when this was the last page.' }
 
   /projects/{projectId}/connections:
     parameters:
