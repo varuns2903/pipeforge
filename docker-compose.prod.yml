@@ -70,11 +70,9 @@ services:
       - '5173:80'
     restart: unless-stopped
 
-  # Scrapes api's and worker's /metrics endpoints (see apps/*/src/metrics.ts)
-  # and evaluates monitoring/prometheus/alert_rules.yml. Alerts are visible
-  # under Prometheus's own Alerts page; wiring a notification channel
-  # (Alertmanager, Slack, PagerDuty, etc.) is a deploy-specific choice left
-  # to whoever operates this stack.
+  # Scrapes api's and worker's /metrics endpoints (see apps/*/src/metrics.ts),
+  # evaluates monitoring/prometheus/alert_rules.yml, and forwards firing
+  # alerts to Alertmanager below for delivery.
   prometheus:
     image: prom/prometheus:v2.55.1
     volumes:
@@ -84,8 +82,33 @@ services:
     depends_on:
       - api
       - worker
+      - alertmanager
     ports:
       - '9090:9090'
+    restart: unless-stopped
+
+  # Delivers alerts fired by Prometheus to Slack (SLACK_ALERT_WEBHOOK_URL)
+  # or email (ALERT_EMAIL_TO, via the same SMTP_* settings the api uses for
+  # execution notifications) — see monitoring/alertmanager/. Neither is
+  # required: with both unset, alerts route to a no-op receiver so the
+  # stack still starts cleanly.
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    entrypoint: ['/bin/sh', '/docker-entrypoint.sh']
+    environment:
+      SLACK_ALERT_WEBHOOK_URL: ${SLACK_ALERT_WEBHOOK_URL:-}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager/docker-entrypoint.sh:/docker-entrypoint.sh:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - '9093:9093'
     restart: unless-stopped
 
   # Pre-provisioned with the Prometheus datasource and the "PipeForge
@@ -111,3 +134,4 @@ volumes:
   uploads_data:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
