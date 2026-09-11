@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { connectionService } from '../services/connection.service';
+import { activityLogService } from '../services/activityLog.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 // Never include encryptedSecret or the raw `secret` request body field here —
@@ -23,6 +24,10 @@ export class ConnectionController {
       }
       const connection = await connectionService.create(
         req.params.projectId as string, req.user.id, name, type, config || {}, secret || {}
+      );
+      await activityLogService.log(
+        req.params.projectId as string, req.user.id, 'connection.created',
+        `Created connection "${connection.name}" (${connection.type})`, { connectionId: connection._id.toString() }
       );
       res.status(201).json(mapToDTO(connection));
     } catch (err: any) {
@@ -58,7 +63,11 @@ export class ConnectionController {
 
   async delete(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await connectionService.delete(req.params.connectionId as string, req.params.projectId as string, req.user.id);
+      const connection = await connectionService.delete(req.params.connectionId as string, req.params.projectId as string, req.user.id);
+      await activityLogService.log(
+        req.params.projectId as string, req.user.id, 'connection.deleted',
+        `Deleted connection "${connection.name}"`, { connectionId: connection._id.toString() }
+      );
       res.status(204).send();
     } catch (err: any) {
       if (err.message.includes('not found')) return res.status(404).json({ error: err.message });

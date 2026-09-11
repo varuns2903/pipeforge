@@ -4,6 +4,7 @@ import { projectController } from '../controllers/project.controller';
 import { pipelineController } from '../controllers/pipeline.controller';
 import { executionController } from '../controllers/execution.controller';
 import { connectionController } from '../controllers/connection.controller';
+import { activityLogController } from '../controllers/activityLog.controller';
 import { fileRouter } from './file.routes';
 import { requireAuth } from '../middleware/auth.middleware';
 import { actionLimiter } from '../middleware/rateLimit';
@@ -35,6 +36,9 @@ projectRouter.get('/:projectId', projectController.get);
 projectRouter.put('/:projectId', nameValidation, validate, projectController.update);
 projectRouter.delete('/:projectId', projectController.delete);
 projectRouter.post('/:projectId/restore', projectController.restore);
+
+// Activity Log (any member can view)
+projectRouter.get('/:projectId/activity', activityLogController.list);
 
 // Member Routes (owner-only to mutate; any member can list)
 projectRouter.get('/:projectId/members', projectController.listMembers);

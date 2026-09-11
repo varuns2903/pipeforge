@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { pipelineService } from '../services/pipeline.service';
+import { activityLogService } from '../services/activityLog.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { PipelineValidator } from '@pipeforge/pipeline-engine';
 import { Execution } from '../models/Execution';
@@ -39,6 +40,10 @@ export class PipelineController {
   async create(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const pipeline = await pipelineService.create(req.body.name, (req.params.projectId as string), req.user.id);
+      await activityLogService.log(
+        req.params.projectId as string, req.user.id, 'pipeline.created',
+        `Created pipeline "${pipeline.name}"`, { pipelineId: pipeline._id.toString() }
+      );
       res.status(201).json(mapToDTO(pipeline));
     } catch (err: any) {
       if (err.message === 'Project not found') return res.status(404).json({ error: err.message });
@@ -80,6 +85,10 @@ export class PipelineController {
     try {
       const { name, nodes, edges, notifications } = req.body;
       const pipeline = await pipelineService.update((req.params.pipelineId as string), (req.params.projectId as string), req.user.id, { name, nodes, edges, notifications });
+      await activityLogService.log(
+        req.params.projectId as string, req.user.id, 'pipeline.updated',
+        `Updated pipeline "${pipeline.name}"`, { pipelineId: pipeline._id.toString() }
+      );
       res.json(mapToDTO(pipeline));
     } catch (err: any) {
       if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
@@ -89,7 +98,11 @@ export class PipelineController {
 
   async delete(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await pipelineService.delete((req.params.pipelineId as string), (req.params.projectId as string), req.user.id);
+      const pipeline = await pipelineService.delete((req.params.pipelineId as string), (req.params.projectId as string), req.user.id);
+      await activityLogService.log(
+        req.params.projectId as string, req.user.id, 'pipeline.deleted',
+        `Deleted pipeline "${pipeline.name}"`, { pipelineId: pipeline._id.toString() }
+      );
       res.status(204).send();
     } catch (err: any) {
       if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
@@ -226,6 +239,10 @@ export class PipelineController {
       // Queue the job
       await queueService.queueExecution(execution._id.toString(), pipeline);
       pipelineExecutionsTotal.inc({ trigger: 'manual' });
+      await activityLogService.log(
+        req.params.projectId as string, req.user.id, 'pipeline.executed',
+        `Ran pipeline "${pipeline.name}"`, { pipelineId: pipeline._id.toString(), executionId: execution._id.toString() }
+      );
 
       res.status(202).json({
         id: execution._id.toString(),

@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { Project, Pipeline } from '@pipeforge/shared';
-import { Workflow, Plus, Trash2, ArrowLeft, Settings2, Users, Plug } from 'lucide-react';
+import { Workflow, Plus, Trash2, ArrowLeft, Settings2, Users, Plug, Activity } from 'lucide-react';
 import { TrashModal } from '../components/TrashModal';
 import { MembersModal } from '../components/MembersModal';
+import { ActivityLogModal } from '../components/ActivityLogModal';
 import { useAuthStore } from '../store/authStore';
 
 export function ProjectDetail() {
@@ -16,6 +17,7 @@ export function ProjectDetail() {
   const [isCreating, setIsCreating] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
 
   const { data: project, isLoading: isLoadingProject } = useQuery<Project>({
     queryKey: ['project', projectId],
@@ -90,6 +92,12 @@ export function ProjectDetail() {
           >
             <Users size={16} /> Members
           </button>
+          <button
+            onClick={() => setShowActivity(true)}
+            className="glass-button px-3 py-2 rounded-md flex items-center gap-2 text-sm"
+          >
+            <Activity size={16} /> Activity
+          </button>
           {project.myRole === 'owner' && (
             <button
               onClick={() => setShowTrash(true)}
@@ -131,6 +139,10 @@ export function ProjectDetail() {
           currentUserId={currentUser.id}
           onClose={() => setShowMembers(false)}
         />
+      )}
+
+      {showActivity && (
+        <ActivityLogModal projectId={projectId!} onClose={() => setShowActivity(false)} />
       )}
 
       {isCreating && (

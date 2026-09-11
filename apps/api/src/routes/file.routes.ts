@@ -9,6 +9,7 @@ import { User } from '../models/User';
 import { MAX_FILE_SIZE_MB } from '../config/env';
 import { getPlanLimits } from '../config/plans';
 import { projectService } from '../services/project.service';
+import { activityLogService } from '../services/activityLog.service';
 import fs from 'fs';
 
 // mergeParams: mounted at /api/projects/:projectId/files (see project.routes.ts),
@@ -84,6 +85,10 @@ router.post('/upload', requireAuth, async (req: AuthRequest, res, next) => {
       originalName: req.file.originalname,
       size: req.file.size
     });
+    await activityLogService.log(
+      req.params.projectId as string, req.user.id, 'file.uploaded',
+      `Uploaded "${req.file.originalname}"`, { size: req.file.size }
+    );
 
     const filePath = `/uploads/${req.file.filename}`;
     res.json({ filePath, originalName: req.file.originalname, size: req.file.size });
@@ -118,6 +123,10 @@ router.delete('/:fileId', requireAuth, async (req: AuthRequest, res, next) => {
     // might contain, so this can never unlink outside uploadDir.
     const diskPath = path.join(uploadDir, path.basename(file.filePath));
     fs.unlink(diskPath, () => {}); // best-effort — the File record is the source of truth for quota either way
+    await activityLogService.log(
+      req.params.projectId as string, req.user.id, 'file.deleted',
+      `Deleted "${file.originalName}"`
+    );
 
     res.status(204).send();
   } catch (err: any) {
