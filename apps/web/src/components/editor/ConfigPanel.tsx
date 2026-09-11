@@ -94,10 +94,10 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { s
                     <div className="mt-4 flex text-sm leading-6 text-text-secondary justify-center">
                       <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-semibold text-accent-500 focus-within:outline-none hover:text-accent-400">
                         <span>{uploading ? 'Uploading...' : 'Upload a file'}</span>
-                        <input id="file-upload" name="file-upload" onClick={(e) => { (e.target as HTMLInputElement).value = ''; }} type="file" className="sr-only" accept=".csv" onChange={handleFileUpload} disabled={uploading} />
+                        <input id="file-upload" name="file-upload" onClick={(e) => { (e.target as HTMLInputElement).value = ''; }} type="file" className="sr-only" accept=".csv,.tsv,.txt" onChange={handleFileUpload} disabled={uploading} />
                       </label>
                     </div>
-                    <p className="text-xs leading-5 text-text-tertiary">CSV up to 50MB</p>
+                    <p className="text-xs leading-5 text-text-tertiary">CSV/TSV up to 50MB</p>
                   </div>
                 </div>
               ) : (
@@ -125,6 +125,19 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { s
                   className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
                   placeholder="/uploads/my-file.csv or 'mock'"
                 />
+              </div>
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Delimiter</label>
+                <select
+                  value={config.delimiter || ','}
+                  onChange={(e) => updateConfig({ delimiter: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value=",">Comma (,) — CSV</option>
+                  <option value={'\t'}>Tab — TSV</option>
+                  <option value=";">Semicolon (;)</option>
+                  <option value="|">Pipe (|)</option>
+                </select>
               </div>
             </div>
           )}

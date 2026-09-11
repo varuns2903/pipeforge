@@ -168,6 +168,7 @@ export class PipelineEngine {
           const stream = fs.createReadStream(fullPath).pipe(parse({
             columns: true,
             skip_empty_lines: true,
+            delimiter: config.delimiter || ',',
             cast: (value) => {
               if (value === 'true') return true;
               if (value === 'false') return false;
@@ -303,6 +304,7 @@ export class PipelineEngine {
           const stream = (response.Body as any).pipe(parse({
             columns: true,
             skip_empty_lines: true,
+            delimiter: config.delimiter || ',',
             cast: (value: string) => {
               if (value === 'true') return true;
               if (value === 'false') return false;
