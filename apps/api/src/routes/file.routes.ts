@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => cb(null, `${uuidv4()}-${sanitizeFilename(file.originalname)}`)
 });
 
-const ALLOWED_EXTENSIONS = new Set(['.csv', '.json']);
+const ALLOWED_EXTENSIONS = new Set(['.csv', '.json', '.xlsx']);
 
 const upload = multer({
   storage,

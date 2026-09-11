@@ -50,6 +50,16 @@ describe('File upload validation (project-scoped)', () => {
     expect(res.body.filePath).toMatch(/^\/uploads\/.+\.csv$/);
   });
 
+  it('accepts a .xlsx file', async () => {
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/files/upload`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .attach('file', Buffer.from('not a real workbook, but upload only checks the extension'), 'report.xlsx');
+
+    expect(res.status).toBe(200);
+    expect(res.body.filePath).toMatch(/^\/uploads\/.+\.xlsx$/);
+  });
+
   it('rejects a disallowed file type', async () => {
     const res = await request(app)
       .post(`/api/projects/${projectId}/files/upload`)

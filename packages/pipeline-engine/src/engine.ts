@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client as PgClient } from 'pg';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import ExcelJS from 'exceljs';
 
 // The engine holds every node's full output in memory for the duration of a
 // run (context: ExecutionContext), so a dataset with unbounded rows can OOM
@@ -31,6 +32,18 @@ function resolveUploadPath(filePath: string): string {
     throw new Error('Invalid file path: must be inside the uploads directory');
   }
   return fullPath;
+}
+
+// ExcelJS cell values aren't always primitives: a formula cell comes back as
+// { formula, result }, and dates as real Date objects — normalize both to
+// what the rest of the engine (and JSON serialization of results) expects.
+function normalizeExcelCell(value: any): any {
+  if (value && typeof value === 'object') {
+    if ('result' in value) return normalizeExcelCell(value.result);
+    if (value instanceof Date) return value.toISOString();
+    if ('text' in value) return value.text; // rich text
+  }
+  return value ?? null;
 }
 
 export interface ExecutionContext {
@@ -186,6 +199,44 @@ export class PipelineEngine {
         }
         const parsed = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
         const rows = Array.isArray(parsed) ? parsed : [parsed];
+        if (rows.length > MAX_ROWS) {
+          throw new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`);
+        }
+        return rows;
+      }
+
+      case 'excel-input': {
+        if (!config.filePath) {
+          throw new Error('excel-input requires a filePath');
+        }
+        const fullPath = resolveUploadPath(config.filePath);
+        if (!fs.existsSync(fullPath)) {
+          throw new Error(`File not found: ${config.filePath}`);
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.readFile(fullPath);
+        const worksheet = config.sheetName
+          ? workbook.getWorksheet(config.sheetName)
+          : workbook.worksheets[Number(config.sheetIndex) || 0];
+        if (!worksheet) {
+          throw new Error(`Sheet not found: ${config.sheetName || `index ${config.sheetIndex || 0}`}`);
+        }
+
+        let headers: string[] = [];
+        const rows: any[] = [];
+        worksheet.eachRow((row, rowNumber) => {
+          // row.values is 1-indexed with values[0] always undefined.
+          const cells = (row.values as any[]).slice(1).map(normalizeExcelCell);
+          if (rowNumber === 1) {
+            headers = cells.map((c, i) => (c === null || c === '' ? `column_${i + 1}` : String(c)));
+            return;
+          }
+          const rowObj: Record<string, any> = {};
+          headers.forEach((header, i) => { rowObj[header] = cells[i] ?? null; });
+          rows.push(rowObj);
+        });
+
         if (rows.length > MAX_ROWS) {
           throw new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`);
         }

@@ -158,6 +158,63 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { s
             </div>
           )}
 
+          {/* EXCEL INPUT */}
+          {selectedNode.data.nodeType === 'excel-input' && (
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Excel Data Source</label>
+
+              {!config.filePath ? (
+                <div className="mt-2 flex justify-center rounded-lg border border-dashed border-border-strong px-6 py-6 hover:border-accent-500/50 transition-colors bg-surface-2 relative">
+                  <div className="text-center">
+                    <Upload className="mx-auto h-8 w-8 text-text-tertiary" aria-hidden="true" />
+                    <div className="mt-4 flex text-sm leading-6 text-text-secondary justify-center">
+                      <label htmlFor="excel-file-upload" className="relative cursor-pointer rounded-md font-semibold text-accent-500 focus-within:outline-none hover:text-accent-400">
+                        <span>{uploading ? 'Uploading...' : 'Upload a file'}</span>
+                        <input id="excel-file-upload" name="excel-file-upload" onClick={(e) => { (e.target as HTMLInputElement).value = ''; }} type="file" className="sr-only" accept=".xlsx" onChange={handleFileUpload} disabled={uploading} />
+                      </label>
+                    </div>
+                    <p className="text-xs leading-5 text-text-tertiary">Excel (.xlsx) up to 50MB</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between bg-surface-2 border border-border-strong rounded-md p-3">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="p-2 bg-blue-500/10 rounded">
+                      <Database size={16} className="text-blue-500" />
+                    </div>
+                    <div className="truncate">
+                      <div className="text-sm font-medium text-text-primary truncate">{config.originalName || 'data.xlsx'}</div>
+                      <div className="text-xs text-text-tertiary truncate">{config.filePath}</div>
+                    </div>
+                  </div>
+                  <button onClick={() => { updateConfig({ filePath: '', originalName: '' }); }} className="text-text-tertiary hover:text-status-error p-1">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Or Manual Path</label>
+                <input
+                  type="text"
+                  value={config.filePath || ''}
+                  onChange={(e) => updateConfig({ filePath: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
+                  placeholder="/uploads/my-file.xlsx"
+                />
+              </div>
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Sheet Name <span className="normal-case text-text-tertiary">(optional, defaults to the first sheet)</span></label>
+                <input
+                  type="text"
+                  value={config.sheetName || ''}
+                  onChange={(e) => updateConfig({ sheetName: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                  placeholder="e.g. Sheet1"
+                />
+              </div>
+            </div>
+          )}
+
           {/* POSTGRES INPUT */}
           {selectedNode.data.nodeType === 'postgres-input' && (
             <div className="space-y-4">

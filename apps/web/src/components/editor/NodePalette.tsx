@@ -1,9 +1,10 @@
-import { Database, Filter, Settings, FileOutput, Calculator, Type, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, Combine, ListOrdered, FileJson } from 'lucide-react';
+import { Database, Filter, Settings, FileOutput, Calculator, Type, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, Combine, ListOrdered, FileJson, FileSpreadsheet } from 'lucide-react';
 
 const NODE_TYPES = [
   { category: 'Input', items: [
     { type: 'csv-input', label: 'CSV Upload', icon: Database },
     { type: 'json-input', label: 'JSON Upload', icon: Database },
+    { type: 'excel-input', label: 'Excel Upload', icon: FileSpreadsheet },
   ]},
   { category: 'Connectors', items: [
     { type: 'postgres-input', label: 'Postgres Query', icon: Database },

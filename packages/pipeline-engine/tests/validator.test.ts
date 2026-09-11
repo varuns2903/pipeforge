@@ -38,6 +38,18 @@ describe('PipelineValidator', () => {
     expect(result.errors[0]).toContain('requires a filePath');
   });
 
+  it('should invalidate an excel-input node missing a filePath', () => {
+    const pipeline = {
+      nodes: [
+        { id: '1', data: { nodeType: 'excel-input', label: 'Input', config: {} } }
+      ],
+      edges: []
+    };
+    const result = validator.validate(pipeline);
+    expect(result.isValid).toBe(false);
+    expect(result.errors[0]).toContain('requires a filePath');
+  });
+
   it('should detect cycles in the graph', () => {
     const pipeline = {
       nodes: [

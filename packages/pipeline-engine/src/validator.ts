@@ -39,6 +39,11 @@ export class PipelineValidator {
         result.errors.push(`Node '${node.data.label}' (csv-input) requires a filePath.`);
         result.isValid = false;
       }
+
+      if (type === 'excel-input' && !config.filePath) {
+        result.errors.push(`Node '${node.data.label}' (excel-input) requires a filePath.`);
+        result.isValid = false;
+      }
       
       if (type === 'filter' && !config.condition) {
         result.errors.push(`Node '${node.data.label}' (filter) requires a condition.`);
