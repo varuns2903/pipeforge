@@ -75,13 +75,13 @@ export class PipelineValidator {
         result.isValid = false;
       }
 
-      if ((type === 'postgres-input' || type === 's3-input' || type === 'api-input') && !config.connectionId) {
+      if ((type === 'postgres-input' || type === 'mysql-input' || type === 's3-input' || type === 'api-input') && !config.connectionId) {
         result.errors.push(`Node '${node.data.label}' (${type}) requires a connectionId.`);
         result.isValid = false;
       }
 
-      if (type === 'postgres-input' && !config.query) {
-        result.errors.push(`Node '${node.data.label}' (postgres-input) requires a query.`);
+      if ((type === 'postgres-input' || type === 'mysql-input') && !config.query) {
+        result.errors.push(`Node '${node.data.label}' (${type}) requires a query.`);
         result.isValid = false;
       }
 

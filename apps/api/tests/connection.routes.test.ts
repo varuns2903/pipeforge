@@ -72,6 +72,39 @@ describe('Connections CRUD (project-scoped)', () => {
     expect(res.status).toBe(400);
   });
 
+  it('creates a mysql connection and never returns the secret', async () => {
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/connections`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        name: 'My MySQL',
+        type: 'mysql',
+        config: { host: 'db.example.com', port: 3306, database: 'app', user: 'appuser' },
+        secret: { password: 'super-secret-password' },
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.config.host).toBe('db.example.com');
+    expect(res.body.type).toBe('mysql');
+    expect(JSON.stringify(res.body)).not.toMatch(/super-secret-password/);
+    expect(res.body.encryptedSecret).toBeUndefined();
+
+    // Deleted immediately — later tests in this file assume exactly one
+    // (the postgres) connection exists in the project.
+    await request(app)
+      .delete(`/api/projects/${projectId}/connections/${res.body.id}`)
+      .set('Authorization', `Bearer ${ownerToken}`);
+  });
+
+  it('rejects a mysql connection missing required fields', async () => {
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/connections`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ name: 'Bad', type: 'mysql', config: {}, secret: {} });
+
+    expect(res.status).toBe(400);
+  });
+
   it('rejects an s3 connection missing the secret access key', async () => {
     const res = await request(app)
       .post(`/api/projects/${projectId}/connections`)

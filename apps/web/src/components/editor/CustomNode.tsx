@@ -6,6 +6,7 @@ const icons: Record<string, any> = {
   'csv-input': Database,
   'json-input': Database,
   'postgres-input': Database,
+  'mysql-input': Database,
   's3-input': Cloud,
   'api-input': Globe,
   'filter': Filter,

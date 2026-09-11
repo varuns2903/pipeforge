@@ -63,6 +63,66 @@ describe.skipIf(!PG_HOST)('postgres-input (real Postgres)', () => {
   });
 });
 
+// Requires a real MySQL reachable at these settings — see .github/workflows/
+// ci.yml for how it's started (docker run mysql:8). Skips cleanly if unset.
+const MYSQL_HOST = process.env.TEST_MYSQL_HOST;
+const MYSQL_PORT = process.env.TEST_MYSQL_PORT ? parseInt(process.env.TEST_MYSQL_PORT, 10) : 3306;
+
+describe.skipIf(!MYSQL_HOST)('mysql-input (real MySQL)', () => {
+  const engine = new PipelineEngine();
+
+  it('runs a query against a real database and returns rows', async () => {
+    const pipeline = {
+      nodes: [
+        {
+          id: '1',
+          data: {
+            nodeType: 'mysql-input',
+            label: 'MySQL',
+            config: {
+              host: MYSQL_HOST,
+              port: MYSQL_PORT,
+              database: 'testdb',
+              user: 'root',
+              password: 'testpass',
+              query: 'SELECT name, age FROM users ORDER BY age ASC',
+              connectionId: 'test-conn',
+            }
+          }
+        }
+      ],
+      edges: []
+    };
+
+    const result = await engine.execute(pipeline);
+    expect(result['1']).toEqual([
+      { name: 'Bob', age: 17 },
+      { name: 'Alice', age: 28 },
+      { name: 'Charlie', age: 34 },
+    ]);
+  });
+
+  it('feeds real MySQL rows into a filter node', async () => {
+    const pipeline = {
+      nodes: [
+        {
+          id: '1',
+          data: {
+            nodeType: 'mysql-input',
+            label: 'MySQL',
+            config: { host: MYSQL_HOST, port: MYSQL_PORT, database: 'testdb', user: 'root', password: 'testpass', query: 'SELECT name, age FROM users', connectionId: 'test-conn' }
+          }
+        },
+        { id: '2', data: { nodeType: 'filter', label: 'Adults', config: { condition: 'row.age >= 18' } } },
+      ],
+      edges: [{ source: '1', target: '2' }]
+    };
+
+    const result = await engine.execute(pipeline);
+    expect(result['2']!.length).toBe(2);
+  });
+});
+
 describe('api-input (real local HTTP server)', () => {
   const engine = new PipelineEngine();
   let server: http.Server;

@@ -8,16 +8,17 @@ import type { Project } from '@pipeforge/shared';
 interface Connection {
   id: string;
   name: string;
-  type: 'postgres' | 's3' | 'api';
+  type: 'postgres' | 'mysql' | 's3' | 'api';
   config: Record<string, any>;
   createdAt: string;
 }
 
-const TYPE_ICON = { postgres: Database, s3: Cloud, api: Globe };
+const TYPE_ICON = { postgres: Database, mysql: Database, s3: Cloud, api: Globe };
+const DEFAULT_PORT = { postgres: '5432', mysql: '3306' };
 
 const EMPTY_FORM = {
   name: '',
-  type: 'postgres' as 'postgres' | 's3' | 'api',
+  type: 'postgres' as 'postgres' | 'mysql' | 's3' | 'api',
   host: '', port: '5432', database: '', user: '', password: '', ssl: false,
   bucket: '', region: '', accessKeyId: '', secretAccessKey: '',
   baseUrl: '', authType: 'none' as 'none' | 'bearer' | 'header', headerName: '', token: '',
@@ -46,8 +47,8 @@ export function Connections() {
     mutationFn: async () => {
       let config: any = {};
       let secret: any = {};
-      if (form.type === 'postgres') {
-        config = { host: form.host, port: Number(form.port) || 5432, database: form.database, user: form.user, ssl: form.ssl };
+      if (form.type === 'postgres' || form.type === 'mysql') {
+        config = { host: form.host, port: Number(form.port) || Number(DEFAULT_PORT[form.type]), database: form.database, user: form.user, ssl: form.ssl };
         secret = { password: form.password };
       } else if (form.type === 's3') {
         config = { bucket: form.bucket, region: form.region };
@@ -82,7 +83,7 @@ export function Connections() {
       <div className="flex items-center justify-between mb-10">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-text-primary">Connections</h1>
-          <p className="text-text-secondary text-sm mt-1">Saved credentials for Postgres, S3, and API data sources, shared with every member of this project. Credentials are encrypted at rest and never shown again after creation.</p>
+          <p className="text-text-secondary text-sm mt-1">Saved credentials for Postgres, MySQL, S3, and API data sources, shared with every member of this project. Credentials are encrypted at rest and never shown again after creation.</p>
         </div>
         {canEdit && (
           <button onClick={() => setIsCreating(!isCreating)} className="accent-button px-4 py-2 rounded-md flex items-center gap-2 text-sm shrink-0">
@@ -104,15 +105,19 @@ export function Connections() {
 
           <div>
             <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Type</label>
-            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as any })}
+            <select value={form.type} onChange={e => {
+              const type = e.target.value as typeof form.type;
+              setForm({ ...form, type, port: DEFAULT_PORT[type as 'postgres' | 'mysql'] || form.port });
+            }}
               className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500">
               <option value="postgres">Postgres</option>
+              <option value="mysql">MySQL</option>
               <option value="s3">S3</option>
               <option value="api">Generic API</option>
             </select>
           </div>
 
-          {form.type === 'postgres' && (
+          {(form.type === 'postgres' || form.type === 'mysql') && (
             <div className="grid grid-cols-2 gap-4">
               <input value={form.host} onChange={e => setForm({ ...form, host: e.target.value })} placeholder="Host" className="px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary" />
               <input value={form.port} onChange={e => setForm({ ...form, port: e.target.value })} placeholder="Port" className="px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary" />
@@ -163,7 +168,7 @@ export function Connections() {
         <div className="flex flex-col items-center justify-center py-20 px-4 border border-dashed border-border-strong rounded-xl bg-surface-1/50">
           <Plug className="text-text-tertiary mb-4" size={24} />
           <h3 className="text-lg font-medium text-text-primary">No connections yet</h3>
-          <p className="text-text-secondary text-sm mt-1 max-w-sm text-center">Add a Postgres, S3, or API connection to use in this project's pipeline connector nodes.</p>
+          <p className="text-text-secondary text-sm mt-1 max-w-sm text-center">Add a Postgres, MySQL, S3, or API connection to use in this project's pipeline connector nodes.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -178,7 +183,7 @@ export function Connections() {
                   <div>
                     <div className="text-sm font-medium text-text-primary">{conn.name}</div>
                     <div className="text-xs text-text-tertiary font-mono">
-                      {conn.type === 'postgres' && `${conn.config.host}:${conn.config.port}/${conn.config.database}`}
+                      {(conn.type === 'postgres' || conn.type === 'mysql') && `${conn.config.host}:${conn.config.port}/${conn.config.database}`}
                       {conn.type === 's3' && `s3://${conn.config.bucket} (${conn.config.region})`}
                       {conn.type === 'api' && conn.config.baseUrl}
                     </div>

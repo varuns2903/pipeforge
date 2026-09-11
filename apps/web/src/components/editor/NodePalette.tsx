@@ -8,6 +8,7 @@ const NODE_TYPES = [
   ]},
   { category: 'Connectors', items: [
     { type: 'postgres-input', label: 'Postgres Query', icon: Database },
+    { type: 'mysql-input', label: 'MySQL Query', icon: Database },
     { type: 's3-input', label: 'S3 File', icon: Cloud },
     { type: 'api-input', label: 'API Request', icon: Globe },
   ]},

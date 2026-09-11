@@ -7,7 +7,7 @@ import { api } from '../../lib/api';
 interface Connection {
   id: string;
   name: string;
-  type: 'postgres' | 's3' | 'api';
+  type: 'postgres' | 'mysql' | 's3' | 'api';
 }
 
 export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { selectedNode: any, setNodes: any, setEdges: any, projectId: string }) {
@@ -20,7 +20,7 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { s
     }
   }, [selectedNode]);
 
-  const isConnectorNode = ['postgres-input', 's3-input', 'api-input'].includes(selectedNode?.data?.nodeType);
+  const isConnectorNode = ['postgres-input', 'mysql-input', 's3-input', 'api-input'].includes(selectedNode?.data?.nodeType);
   const { data: connections } = useQuery<Connection[]>({
     queryKey: ['connections', projectId],
     queryFn: async () => (await api.get(`/projects/${projectId}/connections`)).data,
@@ -260,6 +260,38 @@ export function ConfigPanel({ selectedNode, setNodes, setEdges, projectId }: { s
                 </select>
                 {connections && connections.filter(c => c.type === 'postgres').length === 0 && (
                   <p className="text-xs text-status-warning mt-2">No Postgres connections yet — add one on the Connections page.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">SQL Query</label>
+                <textarea
+                  value={config.query || ''}
+                  onChange={(e) => updateConfig({ query: e.target.value })}
+                  rows={4}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="SELECT * FROM users"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* MYSQL INPUT */}
+          {selectedNode.data.nodeType === 'mysql-input' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Connection</label>
+                <select
+                  value={config.connectionId || ''}
+                  onChange={(e) => updateConfig({ connectionId: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="" disabled>Select a MySQL connection...</option>
+                  {connections?.filter(c => c.type === 'mysql').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {connections && connections.filter(c => c.type === 'mysql').length === 0 && (
+                  <p className="text-xs text-status-warning mt-2">No MySQL connections yet — add one on the Connections page.</p>
                 )}
               </div>
               <div>

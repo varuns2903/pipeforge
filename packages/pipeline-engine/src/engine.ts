@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client as PgClient } from 'pg';
+import mysql from 'mysql2/promise';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import ExcelJS from 'exceljs';
 
@@ -294,6 +295,31 @@ export class PipelineEngine {
           return result.rows;
         } finally {
           await client.end();
+        }
+      }
+
+      case 'mysql-input': {
+        if (!config.host || !config.database || !config.user || !config.query) {
+          throw new Error('mysql-input requires host, database, user, and query');
+        }
+        const connection = await mysql.createConnection({
+          host: config.host,
+          port: config.port || 3306,
+          database: config.database,
+          user: config.user,
+          password: config.password,
+          connectTimeout: 10_000,
+          ...(config.ssl ? { ssl: {} } : {}),
+        });
+        try {
+          const [rows] = await connection.query(config.query);
+          const rowArray = rows as any[];
+          if (rowArray.length > MAX_ROWS) {
+            throw new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`);
+          }
+          return rowArray;
+        } finally {
+          await connection.end();
         }
       }
 

@@ -31,6 +31,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: testpass
+          MYSQL_DATABASE: testdb
+        ports:
+          - 53306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -ptestpass"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     env:
       MONGODB_URI: mongodb://localhost:27017/pipeforge_test
@@ -42,6 +54,8 @@ jobs:
       VITE_API_URL: http://localhost:3000
       TEST_PG_HOST: localhost
       TEST_PG_PORT: 55432
+      TEST_MYSQL_HOST: localhost
+      TEST_MYSQL_PORT: 53306
 
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +71,13 @@ jobs:
         run: |
           PGPASSWORD=testpass psql -h localhost -p 55432 -U postgres -d testdb -c "
             CREATE TABLE users (id SERIAL PRIMARY KEY, name TEXT, age INT);
+            INSERT INTO users (name, age) VALUES ('Alice', 28), ('Bob', 17), ('Charlie', 34);
+          "
+
+      - name: Seed test MySQL (used by pipeline-engine's mysql-input tests)
+        run: |
+          mysql -h 127.0.0.1 -P 53306 -u root -ptestpass testdb -e "
+            CREATE TABLE users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), age INT);
             INSERT INTO users (name, age) VALUES ('Alice', 28), ('Bob', 17), ('Charlie', 34);
           "
 

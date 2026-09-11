@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { connectionSchema, decryptSecret } from '@pipeforge/shared';
 
-const CONNECTOR_NODE_TYPES = new Set(['postgres-input', 's3-input', 'api-input']);
+const CONNECTOR_NODE_TYPES = new Set(['postgres-input', 'mysql-input', 's3-input', 'api-input']);
 
 const Connection = mongoose.model('Connection', connectionSchema);
 

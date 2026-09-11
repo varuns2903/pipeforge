@@ -3,13 +3,13 @@ import { Connection } from '../models/Connection';
 import { CONNECTION_ENCRYPTION_KEY } from '../config/env';
 import { projectService } from './project.service';
 
-const ALLOWED_TYPES = ['postgres', 's3', 'api'] as const;
+const ALLOWED_TYPES = ['postgres', 'mysql', 's3', 'api'] as const;
 type ConnectionType = typeof ALLOWED_TYPES[number];
 
 function validateConfig(type: ConnectionType, config: any, secret: any) {
-  if (type === 'postgres') {
+  if (type === 'postgres' || type === 'mysql') {
     if (!config?.host || !config?.database || !config?.user) {
-      throw new Error('Postgres connections require host, database, and user');
+      throw new Error(`${type === 'postgres' ? 'Postgres' : 'MySQL'} connections require host, database, and user`);
     }
   } else if (type === 's3') {
     if (!config?.bucket || !config?.region) {
