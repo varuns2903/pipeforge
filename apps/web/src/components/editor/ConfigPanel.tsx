@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Settings2, Trash2, Upload, X, Eye, Loader2 } from 'lucide-react';
+import { Settings2, Trash2, Upload, X, Eye, Loader2, GitBranch } from 'lucide-react';
 import { Database } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useUpstreamColumns } from './useUpstreamColumns';
+import { LineageTree } from './LineageTree';
+import type { LineageNode } from './lineageTypes';
 
 interface Connection {
   id: string;
@@ -25,13 +27,29 @@ export function ConfigPanel({ selectedNode, nodes, edges, setNodes, setEdges, pr
   const [config, setConfig] = useState<any>({});
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [lineage, setLineage] = useState<{ column: string; loading: boolean; result: LineageNode | null; error: string | null } | null>(null);
 
   useEffect(() => {
     if (selectedNode) {
       setConfig(selectedNode.data.config || {});
       setPreview(null);
+      setLineage(null);
     }
   }, [selectedNode]);
+
+  const showLineage = async (column: string) => {
+    // Clicking the already-open column's header again closes it.
+    if (lineage?.column === column) { setLineage(null); return; }
+    setLineage({ column, loading: true, result: null, error: null });
+    try {
+      const res = await api.post(`/projects/${projectId}/pipelines/${pipelineId}/lineage`, {
+        nodes, edges, targetNodeId: selectedNode.id, column,
+      });
+      setLineage({ column, loading: false, result: res.data, error: null });
+    } catch (err: any) {
+      setLineage({ column, loading: false, result: null, error: err.response?.data?.error || 'Lineage lookup failed' });
+    }
+  };
 
   const runPreview = async () => {
     setPreview({ loading: true, rows: [], totalRows: 0, truncated: false, error: null });
@@ -135,7 +153,15 @@ export function ConfigPanel({ selectedNode, nodes, edges, setNodes, setEdges, pr
                     <thead className="bg-surface-2 text-text-secondary sticky top-0">
                       <tr>
                         {Object.keys(preview.rows[0]).map(col => (
-                          <th key={col} className="px-2 py-1.5 font-medium border-b border-border-subtle">{col}</th>
+                          <th key={col} className="px-2 py-1.5 font-medium border-b border-border-subtle">
+                            <button
+                              onClick={() => showLineage(col)}
+                              title="Show column lineage"
+                              className={`flex items-center gap-1 hover:text-accent-500 ${lineage?.column === col ? 'text-accent-500' : ''}`}
+                            >
+                              <GitBranch size={11} /> {col}
+                            </button>
+                          </th>
                         ))}
                       </tr>
                     </thead>
@@ -158,6 +184,21 @@ export function ConfigPanel({ selectedNode, nodes, edges, setNodes, setEdges, pr
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {lineage && (
+          <div className="mt-2 rounded-lg border border-border-subtle bg-surface-2/50 p-3 text-xs">
+            <div className="flex items-center gap-1.5 text-text-secondary uppercase tracking-wider text-[10px] mb-2">
+              <GitBranch size={11} /> Lineage: {lineage.column}
+            </div>
+            {lineage.loading ? (
+              <div className="text-text-tertiary">Tracing...</div>
+            ) : lineage.error ? (
+              <div className="text-status-error">{lineage.error}</div>
+            ) : lineage.result ? (
+              <LineageTree node={lineage.result} />
+            ) : null}
           </div>
         )}
       </div>

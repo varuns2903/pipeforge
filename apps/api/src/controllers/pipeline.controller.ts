@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { pipelineService } from '../services/pipeline.service';
+import { projectService } from '../services/project.service';
 import { activityLogService } from '../services/activityLog.service';
 import { previewService } from '../services/preview.service';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { PipelineValidator } from '@pipeforge/pipeline-engine';
+import { PipelineValidator, computeColumnLineage } from '@pipeforge/pipeline-engine';
 import { Execution } from '../models/Execution';
 import { queueService } from '../services/queue.service';
 import { getConcurrentExecutionLimit } from '../services/quota.service';
@@ -300,6 +301,27 @@ export class PipelineController {
       // the engine itself, not a server bug — same spirit as `run`'s
       // pre-flight validation returning 400 rather than 500.
       res.status(400).json({ error: err.message });
+    }
+  }
+
+  // Static analysis of the (possibly unsaved, in-editor) nodes/edges —
+  // no execution, no connector credentials touched — so a viewer can use it
+  // and it works before a pipeline has ever been run.
+  async lineage(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { nodes, edges, targetNodeId, column } = req.body;
+      if (!Array.isArray(nodes) || !Array.isArray(edges) || !targetNodeId || !column) {
+        return res.status(400).json({ error: 'nodes, edges, targetNodeId, and column are required' });
+      }
+      await projectService.getById(req.params.projectId as string, req.user.id, 'viewer');
+      if (!nodes.some((n: any) => n.id === targetNodeId)) {
+        return res.status(400).json({ error: 'Target node not found in the given pipeline' });
+      }
+      const result = computeColumnLineage(nodes, edges, targetNodeId, column);
+      res.json(result);
+    } catch (err: any) {
+      if (err.message === 'Project not found') return res.status(404).json({ error: err.message });
+      next(err);
     }
   }
 }

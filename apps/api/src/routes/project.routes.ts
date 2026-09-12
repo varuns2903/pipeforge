@@ -58,6 +58,7 @@ projectRouter.get('/:projectId/pipelines/:pipelineId/validate', pipelineControll
 // per request, so this caps how many of those a burst can generate.
 projectRouter.post('/:projectId/pipelines/:pipelineId/run', actionLimiter, pipelineController.run);
 projectRouter.post('/:projectId/pipelines/:pipelineId/preview', actionLimiter, pipelineController.preview);
+projectRouter.post('/:projectId/pipelines/:pipelineId/lineage', actionLimiter, pipelineController.lineage);
 projectRouter.get('/:projectId/pipelines/:pipelineId/executions', executionController.listExecutions);
 projectRouter.get('/:projectId/pipelines/:pipelineId/executions/:executionId', executionController.getExecution);
 projectRouter.post('/:projectId/pipelines/:pipelineId/executions/:executionId/retry', actionLimiter, executionController.retryExecution);

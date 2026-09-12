@@ -717,6 +717,47 @@ paths:
         '400': { description: 'Missing request fields, or the subgraph failed to run (bad config, missing connection, etc.)' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /projects/{projectId}/pipelines/{pipelineId}/lineage:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: pipelineId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: >-
+        Traces one output column of one node backward through the given (not
+        necessarily saved) nodes/edges to the column(s) it was derived from —
+        a static analysis of node configs, not an execution, so it works
+        before the pipeline has ever been run. Read-only; viewer role is
+        enough.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nodes, edges, targetNodeId, column]
+              properties:
+                nodes: { type: array, items: { type: object } }
+                edges: { type: array, items: { type: object } }
+                targetNodeId: { type: string }
+                column: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodeId: { type: string }
+                  nodeLabel: { type: string }
+                  nodeType: { type: string }
+                  column: { type: string }
+                  synthetic: { type: boolean, description: 'True for a computed column with no single upstream source column (e.g. aggregate count).' }
+                  truncated: { type: boolean, description: 'True once a cycle or depth limit cut the trace short.' }
+                  sources: { type: array, items: { type: object }, description: 'Same shape, recursively — the columns this one was derived from.' }
+        '400': { description: 'Missing request fields, or targetNodeId not found in the given nodes' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /projects/{projectId}/pipelines/{pipelineId}/executions:
     parameters:
       - { name: projectId, in: path, required: true, schema: { type: string } }
