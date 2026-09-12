@@ -151,6 +151,31 @@ export class PipelineService {
     await pipeline.save();
     return pipeline;
   }
+
+  // Pipeline-to-pipeline chaining (see triggerPipelineIds on the schema).
+  // Scoped to same-project targets only — Connections/Files a target
+  // pipeline's nodes reference are project-scoped, so a cross-project
+  // trigger would need its own authorization story this doesn't attempt.
+  async setTriggers(pipelineId: string, projectId: string, ownerId: string, targetPipelineIds: string[]) {
+    const pipeline = await this.getById(pipelineId, projectId, ownerId, 'editor');
+
+    const uniqueIds = [...new Set(targetPipelineIds)];
+    if (uniqueIds.includes(pipelineId)) {
+      throw new Error('A pipeline cannot trigger itself');
+    }
+    if (uniqueIds.length > 0) {
+      const targets = await Pipeline.find({ _id: { $in: uniqueIds }, projectId, deletedAt: null }).select('_id');
+      const foundIds = new Set(targets.map(t => t._id.toString()));
+      const missing = uniqueIds.filter(id => !foundIds.has(id));
+      if (missing.length > 0) {
+        throw new Error(`Target pipeline(s) not found in this project: ${missing.join(', ')}`);
+      }
+    }
+
+    pipeline.triggerPipelineIds = uniqueIds as any;
+    await pipeline.save();
+    return pipeline;
+  }
 }
 
 export const pipelineService = new PipelineService();

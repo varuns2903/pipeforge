@@ -34,7 +34,14 @@ export const pipelineSchema = new mongoose.Schema({
     secretEncrypted: { type: String },
     onFailure: { type: Boolean, default: true },
     onComplete: { type: Boolean, default: false },
-  }
+  },
+  // Pipeline-to-pipeline chaining: when this pipeline finishes with status
+  // COMPLETED (never on FAILED — a broken upstream stage shouldn't cascade),
+  // the worker queues a fresh run of each of these (same project, since
+  // Connections/Files are project-scoped and a cross-project trigger would
+  // need its own authorization story). A hop-count cap on the queued job's
+  // data (not persisted here) guards against a chain looping back on itself.
+  triggerPipelineIds: { type: [mongoose.Schema.Types.ObjectId], default: [] },
 }, { timestamps: true });
 
 pipelineSchema.index({ projectId: 1 });

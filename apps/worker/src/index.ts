@@ -13,6 +13,7 @@ import { shouldDeliverWebhook } from './webhookGate';
 import { signWebhookPayload } from './webhookSignature';
 import { executionsTotal, executionDuration, startMetricsServer } from './metrics';
 import { runRetentionSweep } from './retention';
+import { triggerDownstream } from './triggerDownstream';
 
 const {
   MONGODB_URI,
@@ -39,6 +40,10 @@ const Pipeline = mongoose.model('Pipeline', pipelineSchema);
 // deliberately not the full User schema (password hash, tokens, etc.), which
 // lives in apps/api and this process has no business reading.
 const UserContact = mongoose.model('User', new mongoose.Schema({ email: String, name: String }));
+// Only the field a triggered pipeline needs — Execution.ownerId is
+// denormalized from the project owner at creation time, same as the API
+// does when a user manually runs a pipeline (see execution.controller.ts).
+const ProjectOwner = mongoose.model('Project', new mongoose.Schema({ ownerId: mongoose.Schema.Types.ObjectId }));
 const logger = createLogger('worker');
 const sendMail = createMailer({
   smtpHost: env.SMTP_HOST,
@@ -118,7 +123,21 @@ async function startWorker() {
 
   const engine = new PipelineEngine();
 
-  const runPipeline = async (job: { id?: string; name?: string; attemptsMade: number; opts: { attempts?: number } }, executionId: string, pipeline: any) => {
+  // Kept open for the worker's whole lifetime (closed in shutdown) — used
+  // both to register the retention job scheduler once at startup and, on
+  // every successful execution, to queue any pipeline-to-pipeline triggers.
+  const jobQueue = new Queue('pipeline-executions', {
+    connection: { host: REDIS_HOST, port: REDIS_PORT }
+  });
+
+  const triggerDownstreamDeps = {
+    pipelineModel: Pipeline,
+    projectModel: ProjectOwner,
+    executionModel: Execution,
+    jobQueue,
+  };
+
+  const runPipeline = async (job: { id?: string; name?: string; attemptsMade: number; opts: { attempts?: number } }, executionId: string, pipeline: any, triggerDepth: number = 0) => {
     const jobId = job.id;
     // BullMQ retries a failed job up to opts.attempts times before giving
     // up; only notify once it's truly done (the last attempt), not on every
@@ -174,6 +193,9 @@ async function startWorker() {
         await notifyOwner(pipeline, updated.ownerId.toString(), executionId, 'COMPLETED');
         await deliverWebhook(pipeline, executionId, 'COMPLETED');
       }
+      // Never on FAILED — a broken upstream stage shouldn't cascade into
+      // triggering pipelines that likely depend on its (missing) output.
+      await triggerDownstream(pipeline, triggerDepth, triggerDownstreamDeps);
     } catch (error: any) {
       logger.error({ jobId, executionId, err: error }, 'Execution failed');
       // Recorded on every attempt, not just the final one — a transient
@@ -196,15 +218,11 @@ async function startWorker() {
     }
   };
 
-  const retentionQueue = new Queue('pipeline-executions', {
-    connection: { host: REDIS_HOST, port: REDIS_PORT }
-  });
-  await retentionQueue.upsertJobScheduler(
+  await jobQueue.upsertJobScheduler(
     RETENTION_JOB_SCHEDULER_ID,
     { pattern: RETENTION_CRON },
     { name: 'data-retention', data: {} }
   );
-  await retentionQueue.close();
 
   const worker = new Worker('pipeline-executions', async job => {
     if (job.name === 'data-retention') {
@@ -244,8 +262,12 @@ async function startWorker() {
 
       await runPipeline(job, execution._id.toString(), pipeline);
     } else {
-      const { executionId, pipeline } = job.data;
-      await runPipeline(job, executionId, pipeline);
+      // Covers both a manually-triggered run (job.name === 'execute-pipeline')
+      // and a pipeline-to-pipeline trigger (job.name === 'triggered-execution')
+      // — both already carry a created Execution + resolved pipeline in
+      // job.data; only the latter carries a non-zero triggerDepth.
+      const { executionId, pipeline, triggerDepth } = job.data;
+      await runPipeline(job, executionId, pipeline, triggerDepth || 0);
     }
   }, {
     connection: {
@@ -265,6 +287,7 @@ async function startWorker() {
     logger.info({ signal }, 'Shutting down worker gracefully');
     try {
       await worker.close(); // stops accepting new jobs, waits for active ones to finish
+      await jobQueue.close();
       await redisPublisher.quit();
       await new Promise<void>((resolve) => metricsServer.close(() => resolve()));
       await mongoose.disconnect();

@@ -69,6 +69,7 @@ projectRouter.delete('/:projectId/pipelines/:pipelineId/schedule', pipelineContr
 projectRouter.get('/:projectId/pipelines/:pipelineId/webhook', pipelineController.getWebhook);
 projectRouter.put('/:projectId/pipelines/:pipelineId/webhook', pipelineController.setWebhook);
 projectRouter.delete('/:projectId/pipelines/:pipelineId/webhook', pipelineController.clearWebhook);
+projectRouter.put('/:projectId/pipelines/:pipelineId/triggers', pipelineController.setTriggers);
 
 // Connection Routes (nested) — shared with every project member, unlike the
 // old global per-user /api/connections.

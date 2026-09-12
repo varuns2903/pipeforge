@@ -15,7 +15,7 @@ import type { Connection, Edge, Node } from '@xyflow/react';
 import { useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { api } from '../lib/api';
-import { ArrowLeft, Save, Play, Check, ShieldCheck, AlertTriangle, Clock, Calendar, Bell, Webhook as WebhookIcon, Undo2, Redo2 } from 'lucide-react';
+import { ArrowLeft, Save, Play, Check, ShieldCheck, AlertTriangle, Clock, Calendar, Bell, Webhook as WebhookIcon, Zap, Undo2, Redo2 } from 'lucide-react';
 
 import { CustomNode } from '../components/editor/CustomNode';
 import { NodePalette } from '../components/editor/NodePalette';
@@ -25,6 +25,7 @@ import { HistoryModal } from '../components/editor/HistoryModal';
 import { ScheduleModal } from '../components/editor/ScheduleModal';
 import { NotificationsModal } from '../components/editor/NotificationsModal';
 import { WebhookModal } from '../components/editor/WebhookModal';
+import { TriggersModal } from '../components/editor/TriggersModal';
 import { DirectionContext } from '../components/editor/DirectionContext';
 import { ValidationContext, type NodeValidationState } from '../components/editor/ValidationContext';
 import { LayoutList, LayoutPanelLeft } from 'lucide-react';
@@ -55,6 +56,7 @@ function EditorCanvas() {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isWebhookOpen, setIsWebhookOpen] = useState(false);
+  const [isTriggersOpen, setIsTriggersOpen] = useState(false);
   const [direction, setDirection] = useState<'TB' | 'LR'>('TB');
   const { pushHistory, undo, redo, resetHistory, canUndo, canRedo } = useHistory(nodes, edges, setNodes, setEdges);
 
@@ -280,6 +282,12 @@ function EditorCanvas() {
           >
             <WebhookIcon size={14} /> Webhook
           </button>
+          <button
+            onClick={() => setIsTriggersOpen(true)}
+            className={`glass-button px-3 py-1.5 rounded flex items-center gap-2 text-sm hover:text-text-primary ${(pipeline?.triggerPipelineIds?.length ?? 0) > 0 ? 'text-accent-500' : 'text-text-secondary'}`}
+          >
+            <Zap size={14} /> Triggers
+          </button>
           <button onClick={handleValidate} className="glass-button px-3 py-1.5 rounded flex items-center gap-2 text-sm text-status-warning hover:text-status-warning">
             <ShieldCheck size={14} /> Validate
           </button>
@@ -376,6 +384,14 @@ function EditorCanvas() {
             projectId={projectId!}
             pipelineId={pipelineId!}
             onClose={() => setIsWebhookOpen(false)}
+          />
+        )}
+        {isTriggersOpen && (
+          <TriggersModal
+            projectId={projectId!}
+            pipelineId={pipelineId!}
+            triggerPipelineIds={pipeline?.triggerPipelineIds || []}
+            onClose={() => setIsTriggersOpen(false)}
           />
         )}
       </div>

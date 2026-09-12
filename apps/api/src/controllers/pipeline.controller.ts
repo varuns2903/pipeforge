@@ -32,6 +32,7 @@ const mapToDTO = (doc: any) => ({
     onFailure: doc.webhook?.onFailure ?? true,
     onComplete: doc.webhook?.onComplete ?? false,
   },
+  triggerPipelineIds: (doc.triggerPipelineIds || []).map((id: any) => id.toString()),
   createdAt: doc.createdAt.toISOString(),
   updatedAt: doc.updatedAt.toISOString(),
   deletedAt: doc.deletedAt ? doc.deletedAt.toISOString() : null,
@@ -187,6 +188,30 @@ export class PipelineController {
       );
       res.status(204).send();
     } catch (err: any) {
+      if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
+      next(err);
+    }
+  }
+
+  async setTriggers(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { targetPipelineIds } = req.body;
+      if (!Array.isArray(targetPipelineIds) || !targetPipelineIds.every((id: any) => typeof id === 'string')) {
+        return res.status(400).json({ error: 'targetPipelineIds must be an array of pipeline ids' });
+      }
+      const pipeline = await pipelineService.setTriggers(
+        (req.params.pipelineId as string), (req.params.projectId as string), req.user.id, targetPipelineIds
+      );
+      await activityLogService.log(
+        req.params.projectId as string, req.user.id, 'pipeline.triggers_updated',
+        `Set "${pipeline.name}" to trigger ${targetPipelineIds.length} pipeline(s) on completion`,
+        { pipelineId: pipeline._id.toString() }
+      );
+      res.json(mapToDTO(pipeline));
+    } catch (err: any) {
+      if (err.message.includes('cannot trigger itself') || err.message.startsWith('Target pipeline')) {
+        return res.status(400).json({ error: err.message });
+      }
       if (err.message.includes('not found')) return res.status(404).json({ error: err.message });
       next(err);
     }
