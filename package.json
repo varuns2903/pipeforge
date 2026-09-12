@@ -11,9 +11,25 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:e2e": "npm test -w @pipeforge/e2e-tests"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "data-pipeline",
+    "etl",
+    "workflow-automation",
+    "visual-editor",
+    "react-flow",
+    "dag",
+    "typescript"
+  ],
+  "author": "Varun S",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/varuns2903/pipeforge.git"
+  },
+  "homepage": "https://github.com/varuns2903/pipeforge#readme",
+  "bugs": {
+    "url": "https://github.com/varuns2903/pipeforge/issues"
+  },
   "type": "commonjs",
   "private": "true",
   "workspaces": [

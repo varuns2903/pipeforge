@@ -26,3 +26,6 @@ A task is considered complete when:
 
 ## Setting up locally
 See the README for instructions on starting the Docker-compose environment (Mongo, Redis) and the web/api/worker apps.
+
+## Changelog
+User-facing changes (new features, fixed bugs, breaking changes) belong in [CHANGELOG.md](./CHANGELOG.md) under an `[Unreleased]` heading — internal refactors and test-only changes don't need an entry.
