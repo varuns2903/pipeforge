@@ -12,7 +12,7 @@ import { projectService } from './project.service';
 // worker's version runs inside a queued job; the two call sites have
 // different enough surrounding code that sharing would mostly just add
 // indirection.
-const CONNECTOR_NODE_TYPES = new Set(['postgres-input', 'mysql-input', 's3-input', 'api-input']);
+const CONNECTOR_NODE_TYPES = new Set(['postgres-input', 'mysql-input', 's3-input', 'api-input', 'kafka-input']);
 
 // Small and fast on purpose — this runs on every click, not once per queued
 // execution, so it stays capped regardless of MAX_PIPELINE_ROWS.

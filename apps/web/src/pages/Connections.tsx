@@ -2,26 +2,27 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api';
-import { Plug, Plus, Trash2, Database, Cloud, Globe, ArrowLeft } from 'lucide-react';
+import { Plug, Plus, Trash2, Database, Cloud, Globe, Radio, ArrowLeft } from 'lucide-react';
 import type { Project } from '@pipeforge/shared';
 
 interface Connection {
   id: string;
   name: string;
-  type: 'postgres' | 'mysql' | 's3' | 'api';
+  type: 'postgres' | 'mysql' | 's3' | 'api' | 'kafka';
   config: Record<string, any>;
   createdAt: string;
 }
 
-const TYPE_ICON = { postgres: Database, mysql: Database, s3: Cloud, api: Globe };
+const TYPE_ICON = { postgres: Database, mysql: Database, s3: Cloud, api: Globe, kafka: Radio };
 const DEFAULT_PORT = { postgres: '5432', mysql: '3306' };
 
 const EMPTY_FORM = {
   name: '',
-  type: 'postgres' as 'postgres' | 'mysql' | 's3' | 'api',
+  type: 'postgres' as 'postgres' | 'mysql' | 's3' | 'api' | 'kafka',
   host: '', port: '5432', database: '', user: '', password: '', ssl: false,
   bucket: '', region: '', accessKeyId: '', secretAccessKey: '',
   baseUrl: '', authType: 'none' as 'none' | 'bearer' | 'header', headerName: '', token: '',
+  brokers: '',
 };
 
 export function Connections() {
@@ -53,6 +54,9 @@ export function Connections() {
       } else if (form.type === 's3') {
         config = { bucket: form.bucket, region: form.region };
         secret = { accessKeyId: form.accessKeyId, secretAccessKey: form.secretAccessKey };
+      } else if (form.type === 'kafka') {
+        config = { brokers: form.brokers };
+        secret = {};
       } else {
         config = { baseUrl: form.baseUrl, authType: form.authType, headerName: form.headerName || undefined };
         secret = { token: form.token || undefined };
@@ -114,6 +118,7 @@ export function Connections() {
               <option value="mysql">MySQL</option>
               <option value="s3">S3</option>
               <option value="api">Generic API</option>
+              <option value="kafka">Kafka</option>
             </select>
           </div>
 
@@ -133,6 +138,13 @@ export function Connections() {
               <input value={form.region} onChange={e => setForm({ ...form, region: e.target.value })} placeholder="Region (e.g. us-east-1)" className="px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary" />
               <input value={form.accessKeyId} onChange={e => setForm({ ...form, accessKeyId: e.target.value })} placeholder="Access Key ID" className="px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary" />
               <input value={form.secretAccessKey} onChange={e => setForm({ ...form, secretAccessKey: e.target.value })} type="password" placeholder="Secret Access Key" className="px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary" />
+            </div>
+          )}
+
+          {form.type === 'kafka' && (
+            <div>
+              <input value={form.brokers} onChange={e => setForm({ ...form, brokers: e.target.value })} placeholder="Brokers (e.g. localhost:9092,localhost:9093)" className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary" />
+              <p className="text-xs text-text-tertiary mt-2">No credentials — for an unauthenticated local/self-hosted broker only.</p>
             </div>
           )}
 
@@ -186,6 +198,7 @@ export function Connections() {
                       {(conn.type === 'postgres' || conn.type === 'mysql') && `${conn.config.host}:${conn.config.port}/${conn.config.database}`}
                       {conn.type === 's3' && `s3://${conn.config.bucket} (${conn.config.region})`}
                       {conn.type === 'api' && conn.config.baseUrl}
+                      {conn.type === 'kafka' && conn.config.brokers}
                     </div>
                   </div>
                 </div>

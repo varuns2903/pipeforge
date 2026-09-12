@@ -1,4 +1,4 @@
-import { Database, Filter, Settings, FileOutput, Calculator, Type, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, Combine, ListOrdered, FileJson, FileSpreadsheet, GitBranch } from 'lucide-react';
+import { Database, Filter, Settings, FileOutput, Calculator, Type, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, Combine, ListOrdered, FileJson, FileSpreadsheet, GitBranch, Radio } from 'lucide-react';
 
 const NODE_TYPES = [
   { category: 'Input', items: [
@@ -11,6 +11,7 @@ const NODE_TYPES = [
     { type: 'mysql-input', label: 'MySQL Query', icon: Database },
     { type: 's3-input', label: 'S3 File', icon: Cloud },
     { type: 'api-input', label: 'API Request', icon: Globe },
+    { type: 'kafka-input', label: 'Kafka Topic', icon: Radio },
   ]},
   { category: 'Transform', items: [
     { type: 'filter', label: 'Filter Rows', icon: Filter },

@@ -11,7 +11,7 @@ import type { LineageNode } from './lineageTypes';
 interface Connection {
   id: string;
   name: string;
-  type: 'postgres' | 'mysql' | 's3' | 'api';
+  type: 'postgres' | 'mysql' | 's3' | 'api' | 'kafka';
 }
 
 interface PreviewState {
@@ -63,7 +63,7 @@ export function ConfigPanel({ selectedNode, nodes, edges, setNodes, setEdges, pr
     }
   };
 
-  const isConnectorNode = ['postgres-input', 'mysql-input', 's3-input', 'api-input'].includes(selectedNode?.data?.nodeType);
+  const isConnectorNode = ['postgres-input', 'mysql-input', 's3-input', 'api-input', 'kafka-input'].includes(selectedNode?.data?.nodeType);
   const { data: connections } = useQuery<Connection[]>({
     queryKey: ['connections', projectId],
     queryFn: async () => (await api.get(`/projects/${projectId}/connections`)).data,
@@ -80,7 +80,7 @@ export function ConfigPanel({ selectedNode, nodes, edges, setNodes, setEdges, pr
     return null;
   }
 
-  const updateConfig = (updates: Record<string, string>) => {
+  const updateConfig = (updates: Record<string, string | boolean>) => {
     const newConfig = { ...config, ...updates };
     setConfig(newConfig);
     setNodes((nds: any[]) =>
@@ -517,6 +517,60 @@ export function ConfigPanel({ selectedNode, nodes, edges, setNodes, setEdges, pr
                   placeholder="data.items"
                 />
               </div>
+            </div>
+          )}
+
+          {/* KAFKA INPUT */}
+          {selectedNode.data.nodeType === 'kafka-input' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Connection</label>
+                <select
+                  value={config.connectionId || ''}
+                  onChange={(e) => updateConfig({ connectionId: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                >
+                  <option value="" disabled>Select a Kafka connection...</option>
+                  {connections?.filter(c => c.type === 'kafka').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {connections && connections.filter(c => c.type === 'kafka').length === 0 && (
+                  <p className="text-xs text-status-warning mt-2">No Kafka connections yet — add one on the Connections page.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Topic</label>
+                <input
+                  type="text"
+                  value={config.topic || ''}
+                  onChange={(e) => updateConfig({ topic: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md font-mono text-sm text-text-primary focus:border-accent-500"
+                  placeholder="orders"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider">Max Messages</label>
+                <input
+                  type="number"
+                  value={config.maxMessages || ''}
+                  onChange={(e) => updateConfig({ maxMessages: e.target.value })}
+                  className="block w-full px-3 py-2 bg-surface-2 border border-border-strong rounded-md text-sm text-text-primary focus:border-accent-500"
+                  placeholder="100"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={config.fromBeginning !== false}
+                  onChange={(e) => updateConfig({ fromBeginning: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                Read from the beginning of the topic
+              </label>
+              <p className="text-xs text-text-tertiary">
+                Each row is a topic message: parsed as JSON when possible, otherwise wrapped as {'{'} value: "..." {'}'}.
+              </p>
             </div>
           )}
 

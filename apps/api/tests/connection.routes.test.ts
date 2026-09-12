@@ -105,6 +105,31 @@ describe('Connections CRUD (project-scoped)', () => {
     expect(res.status).toBe(400);
   });
 
+  it('creates a kafka connection with no secret required', async () => {
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/connections`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ name: 'My Kafka', type: 'kafka', config: { brokers: 'localhost:9092' }, secret: {} });
+
+    expect(res.status).toBe(201);
+    expect(res.body.config.brokers).toBe('localhost:9092');
+    expect(res.body.type).toBe('kafka');
+
+    // Deleted immediately — same reasoning as the mysql connection above.
+    await request(app)
+      .delete(`/api/projects/${projectId}/connections/${res.body.id}`)
+      .set('Authorization', `Bearer ${ownerToken}`);
+  });
+
+  it('rejects a kafka connection missing brokers', async () => {
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/connections`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ name: 'Bad Kafka', type: 'kafka', config: {}, secret: {} });
+
+    expect(res.status).toBe(400);
+  });
+
   it('rejects an s3 connection missing the secret access key', async () => {
     const res = await request(app)
       .post(`/api/projects/${projectId}/connections`)

@@ -17,12 +17,15 @@ export const connectionSchema = new mongoose.Schema({
   projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true, trim: true },
-  type: { type: String, enum: ['postgres', 'mysql', 's3', 'api'], required: true },
+  type: { type: String, enum: ['postgres', 'mysql', 's3', 'api', 'kafka'], required: true },
   // Non-secret fields, safe to return from the API as-is:
   //   postgres: { host, port, database, user, ssl }
   //   mysql:    { host, port, database, user, ssl }
   //   s3:       { bucket, region }
   //   api:      { baseUrl, authType: 'none' | 'bearer' | 'header', headerName? }
+  //   kafka:    { brokers } — comma-separated host:port list; a local,
+  //             unauthenticated broker (the only kind this app can assume is
+  //             "freely available" to test against) has no secret at all.
   config: { type: mongoose.Schema.Types.Mixed, default: {} },
   // AES-256-GCM ciphertext (see packages/shared/src/crypto.ts) of a JSON blob
   // holding whatever's secret for this type:
@@ -30,6 +33,8 @@ export const connectionSchema = new mongoose.Schema({
   //   mysql:    { password }
   //   s3:       { accessKeyId, secretAccessKey }
   //   api:      { token }
+  //   kafka:    {} — nothing secret; encrypted anyway to keep every
+  //             connection type going through the same code path.
   encryptedSecret: { type: String, required: true },
 }, { timestamps: true });
 

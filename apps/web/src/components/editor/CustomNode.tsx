@@ -1,7 +1,7 @@
 import { Handle, Position } from '@xyflow/react';
 import { useDirection } from './DirectionContext';
 import { useNodeValidation } from './ValidationContext';
-import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, GitBranch, FileSpreadsheet, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Database, Filter, Settings, FileOutput, Calculator, ArrowDownAZ, CopyMinus, GitMerge, Eraser, Shuffle, Cloud, Globe, GitBranch, FileSpreadsheet, AlertCircle, AlertTriangle, Radio } from 'lucide-react';
 
 const icons: Record<string, any> = {
   'csv-input': Database,
@@ -11,6 +11,7 @@ const icons: Record<string, any> = {
   'excel-input': FileSpreadsheet,
   's3-input': Cloud,
   'api-input': Globe,
+  'kafka-input': Radio,
   'filter': Filter,
   'branch': GitBranch,
   'select-columns': Settings,

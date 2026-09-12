@@ -38,6 +38,17 @@ describe('PipelineValidator', () => {
     expect(result.errors[0]).toContain('requires a filePath');
   });
 
+  it('should invalidate a kafka-input node missing a connectionId or topic', () => {
+    const pipeline = {
+      nodes: [{ id: '1', data: { nodeType: 'kafka-input', label: 'Orders', config: {} } }],
+      edges: []
+    };
+    const result = validator.validate(pipeline);
+    expect(result.isValid).toBe(false);
+    expect(result.errors).toContain("Node 'Orders' (kafka-input) requires a connectionId.");
+    expect(result.errors).toContain("Node 'Orders' (kafka-input) requires a topic.");
+  });
+
   it('keys each error by the id of the node it belongs to, for UI badging', () => {
     const pipeline = {
       nodes: [

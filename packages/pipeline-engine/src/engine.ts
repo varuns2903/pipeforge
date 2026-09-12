@@ -8,6 +8,7 @@ import { Client as PgClient } from 'pg';
 import mysql from 'mysql2/promise';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import ExcelJS from 'exceljs';
+import { Kafka, logLevel as KafkaLogLevel } from 'kafkajs';
 
 // The engine holds every node's full output in memory for the duration of a
 // run (context: ExecutionContext), so a dataset with unbounded rows can OOM
@@ -400,6 +401,59 @@ export class PipelineEngine {
           throw new Error(`Dataset exceeds the maximum of ${MAX_ROWS} rows (MAX_PIPELINE_ROWS).`);
         }
         return rows;
+      }
+
+      case 'kafka-input': {
+        if (!config.brokers || !config.topic) {
+          throw new Error('kafka-input requires brokers and topic');
+        }
+        const brokers = String(config.brokers).split(',').map((b: string) => b.trim()).filter(Boolean);
+        const maxMessages = Math.min(Number(config.maxMessages) || 100, MAX_ROWS);
+        // Consuming from a live topic never "completes" on its own — this
+        // caps how long a run waits for maxMessages to arrive before
+        // returning whatever it's collected so far, rather than hanging
+        // the pipeline forever on a slow or empty topic.
+        const timeoutMs = Number(config.timeoutMs) || 10000;
+        const fromBeginning = config.fromBeginning !== false;
+
+        const kafka = new Kafka({ clientId: 'pipeforge', brokers, logLevel: KafkaLogLevel.NOTHING });
+        // A fresh, random group id per run (unless the user pins one) means
+        // a re-run always re-reads from `fromBeginning` instead of silently
+        // returning zero rows because a previous run's consumer group
+        // already committed past every message on the topic.
+        const groupId = config.groupId || `pipeforge-${Math.random().toString(36).slice(2)}`;
+        const consumer = kafka.consumer({ groupId });
+
+        const rows: any[] = [];
+        try {
+          await consumer.connect();
+          await consumer.subscribe({ topic: config.topic, fromBeginning });
+
+          await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => resolve(), timeoutMs);
+            consumer.run({
+              eachMessage: async ({ message }) => {
+                if (rows.length >= maxMessages) return;
+                const raw = message.value?.toString('utf-8') ?? '';
+                let parsed: any;
+                try {
+                  parsed = JSON.parse(raw);
+                } catch {
+                  parsed = { value: raw };
+                }
+                rows.push(parsed);
+                if (rows.length >= maxMessages) {
+                  clearTimeout(timer);
+                  resolve();
+                }
+              }
+            }).catch(reject);
+          });
+        } finally {
+          await consumer.disconnect();
+        }
+
+        return rows.slice(0, maxMessages);
       }
 
       case 'filter': {

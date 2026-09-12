@@ -3,7 +3,7 @@ import { Connection } from '../models/Connection';
 import { CONNECTION_ENCRYPTION_KEY } from '../config/env';
 import { projectService } from './project.service';
 
-const ALLOWED_TYPES = ['postgres', 'mysql', 's3', 'api'] as const;
+const ALLOWED_TYPES = ['postgres', 'mysql', 's3', 'api', 'kafka'] as const;
 type ConnectionType = typeof ALLOWED_TYPES[number];
 
 function validateConfig(type: ConnectionType, config: any, secret: any) {
@@ -21,6 +21,10 @@ function validateConfig(type: ConnectionType, config: any, secret: any) {
   } else if (type === 'api') {
     if (!config?.baseUrl) {
       throw new Error('API connections require baseUrl');
+    }
+  } else if (type === 'kafka') {
+    if (!config?.brokers) {
+      throw new Error('Kafka connections require brokers');
     }
   } else {
     throw new Error(`Unknown connection type: ${type}`);

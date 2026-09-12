@@ -158,7 +158,7 @@ components:
         id: { type: string }
         projectId: { type: string }
         name: { type: string }
-        type: { type: string, enum: [postgres, s3, api] }
+        type: { type: string, enum: [postgres, mysql, s3, api, kafka] }
         config: { type: object, description: 'Non-secret fields only, shape depends on type' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -929,7 +929,7 @@ paths:
               required: [name, type, config, secret]
               properties:
                 name: { type: string }
-                type: { type: string, enum: [postgres, s3, api] }
+                type: { type: string, enum: [postgres, mysql, s3, api, kafka] }
                 config: { type: object }
                 secret: { type: object }
       responses:

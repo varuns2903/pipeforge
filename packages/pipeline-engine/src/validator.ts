@@ -89,7 +89,7 @@ export class PipelineValidator {
         addError(node, `Node '${node.data.label}' (cast-type) requires a targetType.`);
       }
 
-      if ((type === 'postgres-input' || type === 'mysql-input' || type === 's3-input' || type === 'api-input') && !config.connectionId) {
+      if ((type === 'postgres-input' || type === 'mysql-input' || type === 's3-input' || type === 'api-input' || type === 'kafka-input') && !config.connectionId) {
         addError(node, `Node '${node.data.label}' (${type}) requires a connectionId.`);
       }
 
@@ -99,6 +99,10 @@ export class PipelineValidator {
 
       if (type === 's3-input' && !config.key) {
         addError(node, `Node '${node.data.label}' (s3-input) requires a key (object path in the bucket).`);
+      }
+
+      if (type === 'kafka-input' && !config.topic) {
+        addError(node, `Node '${node.data.label}' (kafka-input) requires a topic.`);
       }
     });
 
